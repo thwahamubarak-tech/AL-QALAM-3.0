@@ -66,7 +66,7 @@
 
         /* Welcome Banner Design (Darker & Vibrant Colors) */
         #welcomeBanner {
-            background-color: var(--dynamic-color) !important;
+            background-color: #C2185B !important
             background-image: none !important;
             padding: 30px 15px !important;
             border-radius: 0 !important;
@@ -270,7 +270,7 @@
         // കുറച്ചുകൂടി ഡാർക്ക് ആൻഡ് വൈബ്രന്റ് ആക്കിയ കളർ കോഡുകൾ:
         const groupThemeColors = {
             "Andalusian Legends": "#0284c7", // കൂടുതൽ ഡാർക്കായ ബ്ലൂ (Dark Sky Blue)
-            "Ottoman Titans": "#c084fc",     // കൂടുതൽ ഡാർക്കായ പിങ്ക്/പർപ്പിൾ ഷേഡ് (Vibrant Orchid/Pink)
+            "Ottoman Titans": "#E91E63",     // കൂടുതൽ ഡാർക്കായ പിങ്ക്/പർപ്പിൾ ഷേഡ് (Vibrant Orchid/Pink)
             "Baghdad Warriors": "#facc15"    // കൂടുതൽ വ്യക്തതയുള്ള ഡാർക്ക് മഞ്ഞ (Vibrant Yellow)
         };
 
@@ -280,7 +280,7 @@
             "Baghdad Warriors": "#000000"    // മഞ്ഞയായതുകൊണ്ട് ടെക്സ്റ്റ് കറുപ്പ്
         };
 
-        const teamColor = groupThemeColors[currentGroup] || "#0284c7";
+        const teamColor = groupThemeColors[currentGroup] || "#C2185B";
         const teamTextColor = groupTextColors[currentGroup] || "#ffffff";
 
         document.documentElement.style.setProperty('--dynamic-color', teamColor);
@@ -294,6 +294,7 @@
                 bannerDiv.style.color = teamTextColor;
                 bannerDiv.querySelectorAll("div").forEach(el => el.style.color = teamTextColor);
             }
+            if(submitBtn) submitBtn.style.backgroundColor = teamColor;
             if(submitBtn) {
                 submitBtn.style.backgroundColor = teamColor;
                 submitBtn.style.color = teamTextColor;
