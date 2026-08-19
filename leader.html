@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL QALAM 3.0 - Leader Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --accent: #D4AF37; /* Gold */
+            --group-primary: #66070c; 
+            --group-secondary: #a4161a; 
+            --bg-dark: #121212;
+            --text-light: #ffffff;
+            --input-bg: #1e1e1e;
+            --dynamic-color: #0284c7; /* Default Darker Blue */
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding-top: 60px;
+        }
+
+        /* Header Design */
+        .main-header {
+            background-color: var(--group-primary);
+            color: var(--text-light);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            box-sizing: border-box;
+            border-bottom: 2px solid var(--accent) !important;
+        }
+
+        .main-header .brand h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .main-header .brand span {
+            font-size: 13px;
+            color: var(--accent);
+            margin-left: 5px;
+        }
+
+        .main-header a {
+            color: var(--text-light) !important;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        /* Welcome Banner Design (Darker & Vibrant Colors) */
+        #welcomeBanner {
+            background-color: var(--dynamic-color) !important;
+            background-image: none !important;
+            padding: 30px 15px !important;
+            border-radius: 0 !important;
+            border: none !important;
+            margin-bottom: 20px !important;
+            text-align: center;
+            box-shadow: none !important;
+        }
+
+        #welcomeBanner div:first-child {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            opacity: 0.9;
+            font-weight: normal;
+        }
+
+        #welcomeBanner div:last-child {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: none !important;
+        }
+
+        /* Section Titles (Gold) */
+        h3, h4 {
+            color: var(--accent);
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        /* Leader Card */
+        .leader-card {
+            background: var(--input-bg);
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .leader-card label {
+            font-size: 12px;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 4px;
+            margin-top: 10px;
+        }
+
+        .leader-card input, 
+        .leader-card select {
+            width: 100%;
+            padding: 10px;
+            margin: 0 0 10px 0;
+            background: var(--input-bg);
+            border: 1px solid var(--accent);
+            color: var(--text-light);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .leader-card input::placeholder { color: #888; }
+
+        .part-input {
+            margin-top: 10px;
+        }
+
+        /* Submit Button (Matches Theme Color) */
+        .print-btn {
+            background: var(--dynamic-color) !important;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 15px;
+            text-transform: none;
+        }
+
+        .print-btn:hover {
+            opacity: 0.9;
+        }
+
+        #submittedEntriesList p {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        #submittedEntriesList .leader-card {
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+
+        #submittedEntriesList h4 {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        #submittedEntriesList p {
+            margin: 0;
+        }
+
+        .delete-part-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 10px;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: var(--accent);
+        }
+
+        .logo-spinner-img {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 15px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.7; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div id="loadingOverlay" class="loading-overlay">
+        <img src="logo.png" alt="Logo" class="logo-spinner-img">
+        <p>Processing Registration...</p>
+    </div>
+
+    <header class="main-header">
+        <div class="brand">
+            <h2>AL QALAM 3.0 <span id="groupTitleDisplay"></span></h2>
+        </div>
+        <a href="admin-login.html">Logout</a>
+    </header>
+
+    <main class="container">
+        <div id="welcomeBanner">
+            <div>Welcome</div>
+            <div id="bannerGroupName"></div>
+        </div>
+
+        <div class="leader-card">
+            <h3>Register Participants</h3>
+
+            <label>Category</label>
+            <select id="leadCat" onchange="loadProgramsForLeader()">
+                <option value="">Select Category</option>
+                <option value="Junior">Junior</option>
+                <option value="Senior">Senior</option>
+                <option value="General">General</option>
+            </select>
+
+            <label>Program</label>
+            <select id="leadProg" onchange="generateParticipantFields()" onclick="generateParticipantFields()">
+                <option value="">Select Program</option>
+            </select>
+
+            <div id="participantFieldsContainer"></div>
+
+            <button onclick="submitLeaderEntry()" class="print-btn">Submit Entry</button>
+        </div>
+
+        <h3>Submitted Registrations</h3>
+        <div id="submittedEntriesList"></div>
+    </main>
+
+    <script>
+        const SUPABASE_URL = 'https://weqvnlwiqppgxfvtzxhz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const currentGroup = localStorage.getItem("current_leader_group") || "Andalusian Legends";
+        
+        // കുറച്ചുകൂടി ഡാർക്ക് ആൻഡ് വൈബ്രന്റ് ആക്കിയ കളർ കോഡുകൾ:
+        const groupThemeColors = {
+            "Andalusian Legends": "#0284c7", // കൂടുതൽ ഡാർക്കായ ബ്ലൂ (Dark Sky Blue)
+            "Ottoman Titans": "#c084fc",     // കൂടുതൽ ഡാർക്കായ പിങ്ക്/പർപ്പിൾ ഷേഡ് (Vibrant Orchid/Pink)
+            "Baghdad Warriors": "#facc15"    // കൂടുതൽ വ്യക്തതയുള്ള ഡാർക്ക് മഞ്ഞ (Vibrant Yellow)
+        };
+
+        const groupTextColors = {
+            "Andalusian Legends": "#ffffff",
+            "Ottoman Titans": "#ffffff",
+            "Baghdad Warriors": "#000000"    // മഞ്ഞയായതുകൊണ്ട് ടെക്സ്റ്റ് കറുപ്പ്
+        };
+
+        const teamColor = groupThemeColors[currentGroup] || "#0284c7";
+        const teamTextColor = groupTextColors[currentGroup] || "#ffffff";
+
+        document.documentElement.style.setProperty('--dynamic-color', teamColor);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const bannerDiv = document.getElementById("welcomeBanner");
+            const submitBtn = document.querySelector(".print-btn");
+            
+            if(bannerDiv) {
+                bannerDiv.style.backgroundColor = teamColor;
+                bannerDiv.style.color = teamTextColor;
+                bannerDiv.querySelectorAll("div").forEach(el => el.style.color = teamTextColor);
+            }
+            if(submitBtn) {
+                submitBtn.style.backgroundColor = teamColor;
+                submitBtn.style.color = teamTextColor;
+            }
+        });
+
+        document.getElementById("groupTitleDisplay").innerText = `[${currentGroup}]`;
+        const bannerEl = document.getElementById("bannerGroupName");
+        if (bannerEl) { bannerEl.innerText = currentGroup; }
+
+        document.addEventListener("DOMContentLoaded", renderSubmittedEntries);
+
+        async function loadProgramsForLeader() {
+            const cat = document.getElementById("leadCat").value;
+            const progSelect = document.getElementById("leadProg");
+            const container = document.getElementById("participantFieldsContainer");
+
+            container.innerHTML = "";
+            progSelect.innerHTML = '<option value="">Select Program</option>';
+
+            if (!cat) return;
+
+            const { data: allProgs, error } = await db.from('programs')
+                .select('*')
+                .eq('category', cat);
+            
+            if (error) { console.error(error); return; }
+
+            const { data: groupParticipants } = await db.from('participants')
+                .select('program_id')
+                .eq('team_name', currentGroup);
+
+            const countByProg = {};
+            (groupParticipants || []).forEach(p => {
+                countByProg[p.program_id] = (countByProg[p.program_id] || 0) + 1;
+            });
+
+            (allProgs || []).forEach(p => {
+                let maxLimit = p.chest_no_limit || 1;
+                let registeredCount = countByProg[p.name] || 0; 
+
+                if (registeredCount < maxLimit) {
+                    let remaining = maxLimit - registeredCount;
+                    progSelect.innerHTML += `<option value="${p.name}" data-limit="${maxLimit}" data-registered="${registeredCount}">${p.name} (Remaining Slots: ${remaining}/${maxLimit})</option>`;
+                }
+            });
+        }
+
+        function generateParticipantFields() {
+            const progSelect = document.getElementById("leadProg");
+            const container = document.getElementById("participantFieldsContainer");
+            container.innerHTML = "";
+
+            const selectedVal = progSelect.value;
+            if (!selectedVal) return;
+
+            const selectedOpt = progSelect.options[progSelect.selectedIndex];
+            const maxLimit = parseInt(selectedOpt.getAttribute("data-limit") || "1");
+            let alreadyRegistered = parseInt(selectedOpt.getAttribute("data-registered") || "0");
+            let remainingCount = maxLimit - alreadyRegistered;
+
+            if (remainingCount <= 0) {
+                alert("This program is already fully registered by your group!");
+                progSelect.value = "";
+                return;
+            }
+
+            for (let i = 1; i <= remainingCount; i++) {
+                let participantNumber = alreadyRegistered + i;
+                container.innerHTML += `
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <input type="text" class="part-name-input" placeholder="Participant Name #${participantNumber}" style="flex:2; margin:0;">
+                        <input type="number" class="part-chest-input" placeholder="Chest No" style="flex:1; margin:0;">
+                    </div>
+                `;
+            }
+        }
+
+        async function submitLeaderEntry() {
+            const cat = document.getElementById("leadCat").value;
+            const progSelect = document.getElementById("leadProg");
+            const prog = progSelect ? progSelect.value : "";
+
+            if (!cat || !prog) {
+                alert("Please select Category and Program!");
+                return;
+            }
+
+            const nameInputs = document.querySelectorAll(".part-name-input");
+            const chestInputs = document.querySelectorAll(".part-chest-input");
+
+            if (nameInputs.length === 0) {
+                alert("Please select a program to load participant fields!");
+                return;
+            }
+
+            let participants = [];
+            let groupRanges = {
+                "Andalusian Legends": { min: 400, max: 440 },
+                "Ottoman Titans": { min: 500, max: 540 },
+                "Baghdad Warriors": { min: 600, max: 640 }
+            };
+            let range = groupRanges[currentGroup] || { min: 0, max: 99999 };
+
+            let chestsToCheck = [];
+            for (let i = 0; i < nameInputs.length; i++) {
+                let name = nameInputs[i].value.trim();
+                let chestStr = chestInputs[i].value.trim();
+                if (!name && !chestStr) continue;
+                if (!name || !chestStr) {
+                    alert("Please enter both Name and Chest Number for all participants!");
+                    return;
+                }
+                let chest = parseInt(chestStr);
+                if (isNaN(chest)) {
+                    alert("Invalid Chest Number format!");
+                    return;
+                }
+                if (chest < range.min || chest > range.max) {
+                    alert("Invalid Chest Number (" + chest + ") for " + currentGroup + "! Allowed range is " + range.min + " to " + range.max + ".");
+                    return;
+                }
+                chestsToCheck.push(chest);
+            }
+
+            const { data: existing, error: checkError } = await db.from('participants')
+                .select('chest_no')
+                .eq('program_id', prog)
+                .in('chest_no', chestsToCheck);
+            
+            if (checkError) {
+                alert("Error checking duplicates: " + checkError.message);
+                return;
+            }
+
+            if (existing && existing.length > 0) {
+                let dupChests = existing.map(e => e.chest_no).join(', ');
+                alert(`Chest number(s) ${dupChests} are already registered for program "${prog}"!`);
+                return;
+            }
+
+            for (let i = 0; i < nameInputs.length; i++) {
+                let name = nameInputs[i].value.trim();
+                let chestStr = chestInputs[i].value.trim();
+                if (name && chestStr) {
+                    participants.push({ 
+                        name: name, 
+                        chest_no: parseInt(chestStr), 
+                        team_name: currentGroup, 
+                        program_id: prog 
+                    });
+                }
+            }
+
+            if (participants.length === 0) {
+                alert("Please enter at least one participant name and chest number!");
+                return;
+            }
+
+            const { error } = await db.from('participants').insert(participants);
+
+            if (error) {
+                alert("Error saving registration: " + error.message);
+                return;
+            }
+
+            alert("Registration Submitted Successfully!");
+            renderSubmittedEntries();
+            loadProgramsForLeader();
+            document.getElementById("participantFieldsContainer").innerHTML = "";
+        }
+
+        async function deleteParticipant(id) {
+            if (confirm("Are you sure you want to delete this participant?")) {
+                const { error } = await db.from('participants').delete().eq('id', id);
+                if (error) {
+                    alert("Error deleting: " + error.message);
+                    return;
+                }
+                renderSubmittedEntries();
+                loadProgramsForLeader();
+            }
+        }
+
+        async function renderSubmittedEntries() {
+            const { data: entries, error } = await db.from('participants')
+                .select('*')
+                .eq('team_name', currentGroup);
+            
+            const container = document.getElementById("submittedEntriesList");
+            container.innerHTML = "";
+
+            if (error) { console.error(error); return; }
+
+            if (!entries || entries.length === 0) {
+                container.innerHTML = '<p style="font-size:13px; color:#aaa;">No registrations submitted yet.</p>';
+                return;
+            }
+
+            const grouped = {};
+            entries.forEach(e => {
+                if (!grouped[e.program_id]) grouped[e.program_id] = [];
+                grouped[e.program_id].push(e);
+            });
+
+            Object.keys(grouped).forEach(progName => {
+                let rows = grouped[progName];
+                let partListText = rows.map(p =>
+                    `${p.name} <span style="color:var(--accent);">[Chest: ${p.chest_no}]</span> <button onclick="deleteParticipant(${p.id})" class="delete-part-btn">✕</button>`
+                ).join(", ");
+
+                container.innerHTML += `
+                    <div class="leader-card">
+                        <h4 style="color:var(--accent); margin:0;">${progName}</h4>
+                        <p style="font-size:13px; margin:5px 0;">Participants: ${partListText}</p>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

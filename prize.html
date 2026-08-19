@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL QALAM 3.0 - Prize Desk</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .prize-card {
+            background: var(--card-bg);
+            border: 1px solid var(--accent);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="brand">
+            <h2>AL QALAM 3.0 <span style="font-size: 12px; color:white;">[Prize Desk]</span></h2>
+        </div>
+        <a href="admin-login.html" style="color:var(--accent); text-decoration:none; font-size:13px;">Logout</a>
+    </header>
+
+    <main class="container">
+        <h3 style="color:var(--accent);">Stage Prize Distribution Desk</h3>
+        <div id="prizeList"></div>
+    </main>
+
+        <script>
+        const SUPABASE_URL = 'https://weqvnlwiqppgxfvtzxhz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.addEventListener("DOMContentLoaded", renderPrizeDesk);
+
+        function findParticipantByChest(chestNo, participantsList) {
+            if (!chestNo || !participantsList) return null;
+            const target = String(chestNo).trim();
+            for (let p of participantsList) {
+                for (let key of Object.keys(p)) {
+                    if (p[key] !== null && p[key] !== undefined) {
+                        if (String(p[key]).trim() === target) {
+                            return p;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        // 'Manual Entry:' ഒഴിവാക്കി പേര് മാത്രം ക്ലീൻ ചെയ്ത് എടുക്കുന്ന ഫങ്ഷൻ
+        function cleanName(rawName) {
+            if (!rawName) return '';
+            let name = String(rawName);
+            name = name.replace(/manual\s*entry\s*[:\-]?\s*/gi, '').trim();
+            return name;
+        }
+
+        function extractName(p, entry) {
+            if (entry) {
+                for (let key of Object.keys(entry)) {
+                    const lKey = key.toLowerCase();
+                    if ((lKey.includes('name') || lKey.includes('student') || lKey.includes('participant')) && 
+                        !lKey.includes('program') && !lKey.includes('category')) {
+                        let val = cleanName(entry[key]);
+                        if (val && val !== entry.program_name) return val;
+                    }
+                }
+            }
+            if (p) {
+                for (let key of Object.keys(p)) {
+                    const lKey = key.toLowerCase();
+                    if ((lKey.includes('name') || lKey.includes('student') || lKey.includes('participant') || lKey.includes('fullname')) && 
+                        !lKey.includes('program') && !lKey.includes('group') && !lKey.includes('team')) {
+                        let val = cleanName(p[key]);
+                        if (val) return val;
+                    }
+                }
+            }
+            return '';
+        }
+
+        function extractGroup(p, entry) {
+            const searchObj = (obj) => {
+                if (!obj) return '';
+                for (let key of Object.keys(obj)) {
+                    const lKey = key.toLowerCase();
+                    if (lKey.includes('group') || lKey.includes('team') || lKey.includes('house') || lKey.includes('class')) {
+                        let val = String(obj[key] || '').trim();
+                        if (val) return val;
+                    }
+                }
+                return '';
+            };
+            return searchObj(entry) || searchObj(p) || '-';
+        }
+
+        async function renderPrizeDesk() {
+    const { data: marksList, error } = await db.from('marks')
+        .select('*')
+        .ilike('status', '%Sent to Prize%')
+        .eq('prize_given', false);
+    
+    if (error) { console.error("Error fetching marks:", error); return; }
+
+    const container = document.getElementById("prizeList");
+    container.innerHTML = "";
+
+    if (!marksList || marksList.length === 0) {
+        container.innerHTML = "<p style='color:#888;'>No pending prize items available.</p>";
+        return;
+    }
+
+    // programs ടേബിളിൽ നിന്ന് കാറ്റഗറികൾ ഫെച്ച് ചെയ്യുന്നു
+    const { data: programsData } = await db.from('programs').select('name, category');
+    const catMap = {};
+    (programsData || []).forEach(p => { catMap[p.name] = p.category; });
+
+    const grouped = {};
+    marksList.forEach(m => {
+        if (!grouped[m.program_name]) grouped[m.program_name] = [];
+        grouped[m.program_name].push(m);
+    });
+
+    // ✅ അഡ്മിനിലെ രീതി: Participants ഡാറ്റ എടുത്ത് chest_no കൊണ്ട് Map ആക്കുക
+    const { data: participants } = await db.from('participants').select('*');
+    // 🔍 ഡാറ്റാബേസിൽ നിന്ന് കിട്ടുന്ന chest_no-കൾ കൺസോളിൽ കാണുക
+console.log("📌 Marks List Chest No:", marksList.map(m => m.chest_no));
+console.log("📌 Participants List Chest No:", participants.map(p => p.chest_no));
+    const partMap = {};
+    (participants || []).forEach(p => {
+        partMap[String(p.chest_no).trim()] = p;
+    });
+
+    Object.keys(grouped).forEach((progName, idx) => {
+        const entries = grouped[progName].slice().sort((a, b) => (b.mark || 0) - (a.mark || 0));
+        
+        const first = entries[0];
+        const second = entries[1];
+
+        // ✅ അഡ്മിനിലെ രീതി തന്നെ: chest_no കൊണ്ട് partMap ൽ നിന്ന് നേരിട്ട് കണ്ടെത്തുക
+        const parseEntry = (entry) => {
+    if (!entry) return { chest: '-', name: '-', group: '-' };
+    const chest = String(entry.chest_no || entry.chest || '').trim();
+    
+    // 🔥 1. ആദ്യം participants ടേബിളിൽ chest_no ഉണ്ടോ എന്ന് നോക്കുക
+    let pInfo = partMap[chest];
+    
+    // 🔥 2. participants-ൽ ഇല്ലെങ്കിൽ, judge_name-ൽ Manual Entry ഉണ്ടോ എന്ന് നോക്കി പാർസ് ചെയ്യുക
+    if (!pInfo && entry.judge_name && entry.judge_name.startsWith('Manual Entry:')) {
+        let parts = entry.judge_name.replace('Manual Entry:', '').trim().split('(');
+        let name = parts[0].trim();
+        let group = parts[1] ? parts[1].replace(')', '').trim() : '-';
+        return { chest: chest || '-', name: name, group: group };
+    }
+    
+    const name = pInfo ? pInfo.name : (chest ? 'Chest ' + chest : '-');
+    const group = pInfo ? (pInfo.team_name || pInfo.group_name || '-') : '-';
+    return { chest: chest || '-', name, group };
+};
+
+        const fData = parseEntry(first);
+        const sData = parseEntry(second);
+        
+        const category = catMap[progName] || first?.category || 'General';
+
+        container.innerHTML += `
+            <div class="prize-card" style="background:#1a1a1a; border:1px solid var(--accent); padding:15px; border-radius:8px; margin-bottom:12px;">
+                <h3 style="color:var(--accent); margin:0 0 5px 0;">${progName} (${category})</h3>
+                
+                <p style="font-size:14px; margin:6px 0; color:#fff;">
+                    🥇 1st: <strong>${fData.name}</strong> (Chest: ${fData.chest})<br>
+                    <span style="font-size:13px; color:#ccc;">Group: <strong>${fData.group}</strong> | Grade: <span style="color:#ffc107;">${first?.grade || '-'}</span> | Mark: <span style="color:#28a745;">${first?.mark || '-'}</span></span>
+                </p>
+
+                <p style="font-size:14px; margin:6px 0; color:#fff;">
+                    🥈 2nd: <strong>${sData.name}</strong> (Chest: ${sData.chest})<br>
+                    <span style="font-size:13px; color:#ccc;">Group: <strong>${sData.group}</strong> | Grade: <span style="color:#ffc107;">${second?.grade || '-'}</span> | Mark: <span style="color:#28a745;">${second?.mark || '-'}}</span>
+                </p>
+                
+                <label style="display:flex; align-items:center; gap:8px; margin-top:10px; cursor:pointer;">
+                    <input type="checkbox" id="prize_chk_${idx}" style="width:18px; height:18px;">
+                    <span style="color:var(--accent); font-weight:bold;">Trophy & Certificate Awarded</span>
+                </label>
+
+                <button onclick="sendPrizeToAdmin('${progName.replace(/'/g, "\\'")}', ${idx})" style="margin-top:10px; background:#28a745; color:white; border:none; padding:8px 12px; border-radius:4px; font-weight:bold; cursor:pointer; width:100%;">
+                    Give Prize & Update Status
+                </button>
+            </div>
+        `;
+    });
+}
+        async function sendPrizeToAdmin(programName, idx) {
+            const checkbox = document.getElementById(`prize_chk_${idx}`);
+            if (!checkbox || !checkbox.checked) {
+                alert("Please check 'Trophy & Certificate Awarded' before submitting!");
+                return;
+            }
+
+            const { data: records, error: fetchErr } = await db.from('marks')
+                .select('id')
+                .eq('program_name', programName);
+
+            if (fetchErr || !records) {
+                alert('Error processing prize update.');
+                return;
+            }
+
+            for (let rec of records) {
+    // ആദ്യം ആ റെക്കോർഡിന്റെ നിലവിലുള്ള status എടുക്കണം
+    const { data: existing } = await db.from('marks').select('status').eq('id', rec.id).single();
+    let oldStatus = existing?.status || 'Pending';
+    
+    let newStatus = oldStatus.includes('Given') ? oldStatus : oldStatus + ' & Given';
+
+    const { error } = await db.from('marks')
+        .update({ 
+            status: newStatus,  // പുതിയ status ഇവിടെ കൊടുക്കുന്നു
+            prize_given: true
+        })
+        .eq('id', rec.id);
+                
+                if (error) { 
+                    alert('Error updating prize status: ' + error.message); 
+                    return; 
+                }
+            }
+
+            alert("Prize status successfully updated to Given!");
+            renderPrizeDesk();
+        }
+    </script>
+</body>
+</html>

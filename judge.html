@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL QALAM 3.0 - Judges Panel</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="brand">
+            <h2>AL QALAM 3.0 <span style="font-size: 12px; color:white;">[Judges Panel]</span></h2>
+        </div>
+        <a href="admin-login.html" style="color:var(--accent); text-decoration:none; font-size:13px;">Logout</a>
+    </header>
+
+    <main class="container">
+        <h3 style="color:var(--accent);">Evaluation Portal</h3>
+        <div id="judgeQueueContainer"></div>
+    </main>
+
+    <script>
+        // Supabase Client Config
+        const SUPABASE_URL = 'https://weqvnlwiqppgxfvtzxhz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.addEventListener("DOMContentLoaded", renderJudgeDesk);
+
+        // --- 1. ജഡ്ജ് ഡെസ്ക് റെൻഡർ ചെയ്യുക ---
+        async function renderJudgeDesk() {
+            const container = document.getElementById("judgeQueueContainer");
+            container.innerHTML = "<p style='color:#888;'>Loading...</p>";
+
+            const { data: codedRows } = await db.from('code_letters').select('*');
+            const { data: participants } = await db.from('participants').select('*');
+            const { data: existingMarks } = await db.from('marks').select('chest_no, program_name');
+            const { data: programs } = await db.from('programs').select('name, category');
+
+            const catMap = {};
+            (programs || []).forEach(p => { catMap[p.name] = p.category; });
+
+            const partMap = {};
+            (participants || []).forEach(p => { partMap[String(p.chest_no).trim() + "_" + p.program_id] = p; });
+
+            // ഇതിനകം judge ചെയ്ത (chest_no + program) combinations
+            const markedSet = new Set();
+            (existingMarks || []).forEach(m => {
+                markedSet.add(String(m.chest_no).trim() + "_" + m.program_name);
+            });
+
+            // ഇനിയും judge ചെയ്യാത്ത code_letters മാത്രം
+            const pending = (codedRows || []).filter(c => {
+                return !markedSet.has(String(c.chest_no).trim() + "_" + c.program_name);
+            });
+
+            container.innerHTML = "";
+
+            if (pending.length === 0) {
+                container.innerHTML = "<p style='color:#888;'>No active competitions waiting for evaluation.</p>";
+                return;
+            }
+
+            // പ്രോഗ്രാം അനുസരിച്ച് ഗ്രൂപ്പ് ചെയ്യുന്നു
+            const groupedMap = {};
+            pending.forEach(c => {
+                const key = c.program_name;
+                if (!groupedMap[key]) {
+                    groupedMap[key] = { prog: c.program_name, cat: catMap[c.program_name] || '', items: [] };
+                }
+                const p = partMap[String(c.chest_no).trim() + "_" + c.program_name] || {};
+                groupedMap[key].items.push({
+                    code: c.code_letter,
+                    chestNo: c.chest_no,
+                    name: p.name || '-',
+                    group: p.team_name || '-'
+                });
+            });
+
+            let groupKeys = Object.keys(groupedMap);
+
+            groupKeys.forEach((key, groupIdx) => {
+                const groupObj = groupedMap[key];
+                let allCandidatesHTML = '';
+                let totalCandidatesCount = groupObj.items.length;
+
+                groupObj.items.forEach((c, uniqueIdx) => {
+                    allCandidatesHTML += `
+                        <div style="display:flex; align-items:center; background:#222; padding:6px 8px; margin-bottom:5px; border-radius:4px; border:1px solid #444; gap:8px;">
+                            <div style="font-weight:bold; color:var(--accent); font-size:18px; min-width:50px; text-align:center;">
+                                ${c.code}
+                            </div>
+                            <div style="flex:0 0 40px; text-align:center; display:flex; justify-content:center; align-items:center;" id="badge_${groupIdx}_${uniqueIdx}">
+                            </div>
+                            <div style="flex:1;">
+                                <select id="j_grade_${groupIdx}_${uniqueIdx}" style="width:100%; padding:5px; background:#2a2a2a; color:white; border-radius:3px; font-size:12px;">
+                                    <option value="">Grade</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A">A</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B">B</option>
+                                    <option value="C+">C+</option>
+                                    <option value="C">C</option>
+                                    <option value="D">D</option>
+                                </select>
+                            </div>
+                            <div style="flex:1;">
+                                <input type="number" id="j_mark_${groupIdx}_${uniqueIdx}" placeholder="Marks" oninput="calculateWinners(${groupIdx}, ${totalCandidatesCount})" style="width:100%; padding:5px; background:#2a2a2a; color:white; border-radius:3px; box-sizing:border-box; font-size:12px;">
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="schedule-item" style="border:1px solid var(--accent); padding:12px; margin-bottom:15px; border-radius:6px; background:#1a1a1a;">
+                        <h3 style="color:var(--accent); margin:0 0 8px 0; font-size:15px;">${groupObj.prog} (${groupObj.cat})</h3>
+                        
+                        <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Enter Grades & Marks for Codes:</div>
+                        ${allCandidatesHTML}
+
+                        <input type="text" id="j_judgeName_${groupIdx}" placeholder="Judge Name" style="width:100%; padding:7px; margin-top:8px; background:#2a2a2a; color:white; border-radius:4px; box-sizing:border-box; font-size:12px;">
+
+                        <button onclick="submitJudgeResult(${groupIdx})" class="print-btn" style="width:100%; margin-top:10px; padding:8px; font-size:13px; background:#D4AF37; color:#000; border:none; font-weight:bold; border-radius:4px; cursor:pointer;">Submit Evaluation to Admin</button>
+                    </div>
+                `;
+            });
+
+            window._judgeGroupCache = groupedMap;
+            window._judgeGroupKeys = groupKeys;
+        }
+
+        // --- 2. മെഡൽ കണക്കാക്കാൻ ---
+        function calculateWinners(groupIdx, totalCandidates) {
+            let scoresList = [];
+            for(let i = 0; i < totalCandidates; i++) {
+                let markInput = document.getElementById(`j_mark_${groupIdx}_${i}`);
+                let mark = markInput && markInput.value !== "" ? parseFloat(markInput.value) : -1;
+                scoresList.push({ index: i, mark: mark });
+            }
+
+            scoresList.sort((a, b) => b.mark - a.mark);
+
+            for(let i = 0; i < totalCandidates; i++) {
+                let badgeSpan = document.getElementById(`badge_${groupIdx}_${i}`);
+                if(badgeSpan) badgeSpan.innerHTML = "";
+            }
+
+            let validScores = scoresList.filter(s => s.mark >= 0);
+            if(validScores.length > 0 && validScores[0].mark >= 0) {
+                if(validScores[0]) document.getElementById(`badge_${groupIdx}_${validScores[0].index}`).innerHTML = `<span style="font-size:24px;">🥇</span>`;
+                if(validScores[1] && validScores[1].mark >= 0) document.getElementById(`badge_${groupIdx}_${validScores[1].index}`).innerHTML = `<span style="font-size:24px;">🥈</span>`;
+                if(validScores[2] && validScores[2].mark >= 0) document.getElementById(`badge_${groupIdx}_${validScores[2].index}`).innerHTML = `<span style="font-size:24px;">🥉</span>`;
+            }
+        }
+
+        // --- 3. മാർക്ക് സബ്മിറ്റ് ചെയ്യുക (Supabase marks table-ലേക്ക്) ---
+        async function submitJudgeResult(groupIdx) {
+            const groupKeys = window._judgeGroupKeys;
+            const groupedMap = window._judgeGroupCache;
+
+            if(!groupKeys || !groupKeys[groupIdx] || !groupedMap) {
+                alert("Data error!");
+                return;
+            }
+
+            const key = groupKeys[groupIdx];
+            const groupObj = groupedMap[key];
+
+            const judgeNameInput = document.getElementById(`j_judgeName_${groupIdx}`);
+            const judgeName = judgeNameInput ? judgeNameInput.value.trim() : "";
+            if(!judgeName) return alert("Please enter Judge Name!");
+
+            // 🛡️ ഒരേ chest_no-ൽ ഇതിനകം മാർക്ക് ഉണ്ടോ എന്ന് പരിശോധിക്കുന്നു
+            for (let i = 0; i < groupObj.items.length; i++) {
+                const c = groupObj.items[i];
+                const { data: existing, error: checkErr } = await db.from('marks')
+                    .select('id')
+                    .eq('program_name', groupObj.prog)
+                    .eq('chest_no', c.chestNo);
+                
+                if (checkErr) { alert("Error checking duplicates: " + checkErr.message); return; }
+                if (existing && existing.length > 0) {
+                    alert(`Chest No ${c.chestNo} has already been evaluated for this program!`);
+                    return;
+                }
+            }
+
+            let markRows = [];
+
+            groupObj.items.forEach((c, uniqueIdx) => {
+                const gradeEl = document.getElementById(`j_grade_${groupIdx}_${uniqueIdx}`);
+                const markEl = document.getElementById(`j_mark_${groupIdx}_${uniqueIdx}`);
+
+                const grade = gradeEl ? gradeEl.value : "";
+                const markVal = markEl ? markEl.value : "";
+                const mark = markVal !== "" ? parseFloat(markVal) : 0;
+
+                markRows.push({
+                    program_name: groupObj.prog,
+                    chest_no: c.chestNo,
+                    mark: mark,
+                    grade: grade,
+                    status: 'Pending',
+                    judge_name: judgeName
+                });
+            });
+
+            const { error } = await db.from('marks').insert(markRows);
+
+            if (error) {
+                alert("Error submitting evaluation: " + error.message);
+                return;
+            }
+
+            alert("Evaluation Submitted to Master Admin Desk Successfully!");
+            renderJudgeDesk();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL QALAM 3.0 - Code Letter Officer</title>
+    <!-- CSS പാത്ത് ശരിയാക്കി -->
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header class="main-header">
+        <div class="brand">
+            <h2>AL QALAM 3.0 <span style="font-size: 12px; color:white;">[Code Letter Desk]</span></h2>
+        </div>
+        <a href="admin-login.html" style="color:var(--accent); text-decoration:none; font-size:13px;">Logout</a>
+    </header>
+
+    <main class="container">
+        <h3 style="color:var(--accent);">Assign Code Letters to Participants</h3>
+        <input type="text" id="codeSearch" placeholder="Search by program, category, or participant..." onkeyup="renderCodeDesk()" style="width: 100%; padding: 10px; margin-bottom: 15px; background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 4px;">
+        <div id="codeAssignContainer"></div>
+    </main>
+
+    <script src="js/db.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", renderCodeDesk);
+
+        async function renderCodeDesk() {
+            const searchTerm = (document.getElementById("codeSearch").value || "").trim().toLowerCase();
+            const container = document.getElementById("codeAssignContainer");
+            container.innerHTML = "<p style='color:#888;'>Loading...</p>";
+
+            const { data: participants } = await window.dbClient.from('participants').select('*');
+            const { data: codedRows } = await window.dbClient.from('code_letters').select('chest_no, program_name');
+            const { data: programs } = await window.dbClient.from('programs').select('name, category');
+
+            const catMap = {};
+            (programs || []).forEach(p => { catMap[p.name] = p.category; });
+
+            // ഇതിനകം code letter കിട്ടിയ (chest_no + program) combinations
+            const codedSet = new Set();
+            (codedRows || []).forEach(c => {
+                codedSet.add(String(c.chest_no).trim() + "_" + c.program_name);
+            });
+
+            // ഇനിയും code letter കിട്ടാത്തവരെ മാത്രം എടുക്കുന്നു
+            let pending = (participants || []).filter(p => {
+                return !codedSet.has(String(p.chest_no).trim() + "_" + p.program_id);
+            });
+
+            // സെർച്ച് ഫിൽട്ടർ
+            if (searchTerm) {
+                pending = pending.filter(p => {
+                    let cat = catMap[p.program_id] || '';
+                    return (p.name || '').toLowerCase().includes(searchTerm) ||
+                           (p.program_id || '').toLowerCase().includes(searchTerm) ||
+                           cat.toLowerCase().includes(searchTerm) ||
+                           (p.team_name || '').toLowerCase().includes(searchTerm);
+                });
+            }
+
+            container.innerHTML = "";
+
+            if (pending.length === 0) {
+                container.innerHTML = "<p style='color:#888;'>No pending registrations to code.</p>";
+                return;
+            }
+
+            // പ്രോഗ്രാം അനുസരിച്ച് ഗ്രൂപ്പ് ചെയ്യുന്നു
+            let groupedMap = {};
+            pending.forEach(p => {
+                let key = p.program_id;
+                if (!groupedMap[key]) {
+                    groupedMap[key] = { prog: p.program_id, cat: catMap[p.program_id] || '', items: [] };
+                }
+                groupedMap[key].items.push(p);
+            });
+
+            let groupKeys = Object.keys(groupedMap);
+
+            groupKeys.forEach((key, groupIdx) => {
+                let item = groupedMap[key];
+                let rows = "";
+
+                item.items.forEach((p, index) => {
+                    let chestDisplay = p.chest_no ? ` <b style="color:#00ffcc;">[Chest No: ${p.chest_no}]</b>` : '';
+
+                    let codeOptions = '<option value="">Select Code Letter</option>';
+                    ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].forEach(letter => {
+                        codeOptions += `<option value="${letter}">${letter}</option>`;
+                    });
+
+                    rows += `
+                        <div style="display:flex; align-items:center; gap:10px; margin:8px 0; background:#222; padding:8px; border-radius:4px;">
+                            <span style="flex:1; color:#fff;">${p.name}${chestDisplay} <b style="color:#ffcc00; font-size:12px;">(${p.team_name})</b></span>
+                            <select id="code_g_${groupIdx}_${index}" data-chest="${p.chest_no}" data-prog="${item.prog}" style="width:150px; padding:6px; background:#2a2a2a; border:1px solid #444; color:white; border-radius:4px;">
+                                ${codeOptions}
+                            </select>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="schedule-item" style="border:1px solid var(--accent); padding:12px; margin-bottom:15px; border-radius:6px; background:#1a1a1a;">
+                        <h4 style="color:var(--accent); margin:0 0 10px 0;">${item.prog} (${item.cat})</h4>
+                        ${rows}
+                        <button onclick="sendGroupToJudge('code_g_${groupIdx}_', ${item.items.length})" class="print-btn" style="width:100%; margin-top:10px; padding:10px; background:#D4AF37; color:#000; border:none; font-weight:bold; border-radius:4px; cursor:pointer;">Send to Judges Panel</button>
+                    </div>
+                `;
+            });
+        }
+
+        async function sendGroupToJudge(idPrefix, totalCount) {
+            let codeRows = [];
+            let valid = true;
+
+            for (let i = 0; i < totalCount; i++) {
+                const selectEl = document.getElementById(`${idPrefix}${i}`);
+                if (!selectEl) continue;
+
+                const codeVal = selectEl.value.trim();
+                if (!codeVal) valid = false;
+
+                codeRows.push({
+                    chest_no: selectEl.getAttribute("data-chest"),
+                    program_name: selectEl.getAttribute("data-prog"),
+                    code_letter: codeVal
+                });
+            }
+
+            if (!valid) {
+                alert("Please select code letters (A-J) for all participants in this program!");
+                return;
+            }
+
+            const { error } = await window.dbClient.from('code_letters').insert(codeRows);
+
+            if (error) {
+                alert("Error saving code letters: " + error.message);
+                return;
+            }
+
+            alert("Code Letters Assigned & Sent to Judges Desk Successfully!");
+            renderCodeDesk();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL QALAM 3.0 - Announcer Desk</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .ann-card {
+            background: var(--card-bg);
+            border: 1px solid var(--accent);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="brand">
+            <h2>AL QALAM 3.0 <span style="font-size: 12px; color:white;">[Announcer Desk]</span></h2>
+        </div>
+        <a href="admin-login.html" style="color:var(--accent); text-decoration:none; font-size:13px;">Logout</a>
+    </header>
+
+    <main class="container">
+        <h3 style="color:var(--accent);">Results Pending Announcement</h3>
+        <div id="announcerQueueList"></div>
+    </main>
+
+    <script>
+        const SUPABASE_URL = 'https://weqvnlwiqppgxfvtzxhz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.addEventListener("DOMContentLoaded", renderAnnouncerDesk);
+
+        async function renderAnnouncerDesk() {
+            // 'marks' ടേബിളിൽ നിന്ന് 'Approved' ആയ റിസൾട്ടുകൾ എടുക്കുന്നു
+            const { data: marksList, error: marksErr } = await db.from('marks').select('*').eq('status', 'Approved');
+
+            if (marksErr) {
+                console.error(marksErr);
+                document.getElementById("announcerQueueList").innerHTML = `<p style='color:red;'>Error fetching data: ${marksErr.message}</p>`;
+                return;
+            }
+
+            let list = marksList || [];
+
+            const container = document.getElementById("announcerQueueList");
+            container.innerHTML = "";
+
+            if (!list || list.length === 0) {
+                container.innerHTML = "<p style='color:#888;'>No pending results for announcement.</p>";
+                return;
+            }
+
+            // programs ടേബിളിൽ നിന്ന് കാറ്റഗറികൾ ഫെച്ച് ചെയ്യുന്നു
+            const { data: programsData } = await db.from('programs').select('name, category');
+            const catMap = {};
+            (programsData || []).forEach(p => { catMap[p.name] = p.category; });
+
+            // പേരും ഗ്രൂപ്പും കിട്ടാൻ participants table കൂടി എടുക്കുന്നു
+            const { data: participants } = await db.from('participants').select('chest_no, name, team_name, program_id');
+            const partMap = {};
+            (participants || []).forEach(p => {
+                let cleanProgId = String(p.program_id || '').trim().toLowerCase();
+                let cleanChest = String(p.chest_no || '').trim();
+                partMap[cleanChest + "_" + cleanProgId] = p;
+            });
+
+            const groupedData = {};
+            list.forEach(item => {
+                const key = item.program_name || item.program;
+                if (!groupedData[key]) groupedData[key] = [];
+                groupedData[key].push(item);
+            });
+
+            for (const progName in groupedData) {
+                const progMarks = groupedData[progName];
+                progMarks.sort((a, b) => (b.mark || 0) - (a.mark || 0));
+
+                const category = catMap[progName] || progMarks[0].category || 'General';
+                const top3 = progMarks.slice(0, 3);
+                const medals = ['🥇', '🥈', '🥉'];
+
+                let winnersHtml = '';
+                top3.forEach((p, idx) => {
+                    let cleanProgName = String(progName || '').trim().toLowerCase();
+                    let cleanChest = String(p.chest_no || '').trim();
+                    const pInfo = partMap[cleanChest + "_" + cleanProgName] || {};
+                    
+                    let studentName = 'Chest ' + p.chest_no;
+                    let groupName = pInfo.team_name || '-';
+                    
+                    if (p.judge_name && p.judge_name.startsWith('Manual Entry:')) {
+                        let parts = p.judge_name.replace('Manual Entry:', '').trim().split('(');
+                        studentName = parts[0].trim();
+                        if (parts[1]) {
+                            groupName = parts[1].replace(')', '').trim();
+                        }
+                    } else {
+                        studentName = pInfo.name || p.name || ('Chest ' + p.chest_no);
+                    }
+
+                    let gradeVal = p.grade || '-';
+                    let ptsVal = p.mark || '0';
+
+                    winnersHtml += `
+                        <div style="background:#222; border:1px solid #444; border-radius:6px; padding:10px; margin-bottom:6px;">
+                            <div style="display:flex; align-items:center; gap:8px; color:#fff;">
+                                <span style="font-size:18px;">${medals[idx]}</span>
+                                <span style="font-size:15px; font-weight:bold;">${studentName} (Chest: ${p.chest_no})</span>
+                                <span style="color:#D4AF37; font-size:12px;">[Group: ${groupName}]</span>
+                                <span style="color:#ffeb3b; font-size:13px;">(Grade: ${gradeVal} | Pts: ${ptsVal})</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="ann-card" style="background:#1a1a1a; border:1px solid var(--accent); border-radius:8px; padding:15px; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px; margin-bottom:10px;">
+                            <span style="font-size:18px; font-weight:bold; color:var(--accent);">${progName}</span>
+                            <span style="background:#333; color:#ffeb3b; padding:3px 8px; border-radius:4px; font-size:12px; border:1px solid #555;">Category: ${category}</span>
+                        </div>
+                        <div style="font-size:12px; color:#aaa; margin-bottom:8px;">Judge/Source: ${progMarks[0]?.judge_name || 'Unknown'}</div>
+                        <div>${winnersHtml}</div>
+                        <button onclick="markAsAnnounced('${progName.replace(/'/g, "\\'")}')" style="width:100%; margin-top:10px; background:#28a745; border:none; padding:10px; font-weight:bold; cursor:pointer; font-size:14px; border-radius:5px; color:#fff;">
+                            ✅ Mark as Announced
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+   async function markAsAnnounced(programName) {
+    const { data: records, error: fetchErr } = await db.from('marks')
+        .select('id')
+        .eq('program_name', programName);
+    
+    if (fetchErr) {
+        alert('Error: ' + fetchErr.message);
+        return;
+    }
+
+    if (!records || records.length === 0) {
+        alert('No records found for this program!');
+        return;
+    }
+
+    for (let rec of records) {
+        await db.from('marks')
+            .update({ status: 'Announced' })
+            .eq('id', rec.id);
+    }
+
+    alert('Marked as Announced Successfully!');
+    if (typeof renderAnnounceDesk === 'function') {
+        renderAnnounceDesk();
+    } else {
+        location.reload();
+    }
+}
+    </script>
+
+</body>
+</html>
