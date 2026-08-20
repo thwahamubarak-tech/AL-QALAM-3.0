@@ -64,9 +64,10 @@
             padding: 20px;
         }
 
-        /* Welcome Banner Design */
+        /* Welcome Banner Design (Darker & Vibrant Colors) */
         #welcomeBanner {
-            background-color: var(--dynamic-color) !important;
+            background-color: #C2185B !important
+            background-image: none !important;
             padding: 30px 15px !important;
             border-radius: 0 !important;
             border: none !important;
@@ -246,7 +247,7 @@
             </select>
 
             <label>Program</label>
-            <select id="leadProg" onchange="generateParticipantFields()">
+            <select id="leadProg" onchange="generateParticipantFields()" onclick="generateParticipantFields()">
                 <option value="">Select Program</option>
             </select>
 
@@ -267,15 +268,15 @@
         const currentGroup = localStorage.getItem("current_leader_group") || "Andalusian Legends";
         
         const groupThemeColors = {
-            "Andalusian Legends": "#0284c7", 
-            "Ottoman Titans": "#E91E63",     
-            "Baghdad Warriors": "#facc15"    
+            "Andalusian Legends": "#0284c7",
+            "Ottoman Titans": "#E91E63",
+            "Baghdad Warriors": "#facc15"
         };
 
         const groupTextColors = {
             "Andalusian Legends": "#ffffff",
             "Ottoman Titans": "#ffffff",
-            "Baghdad Warriors": "#000000"    
+            "Baghdad Warriors": "#000000"
         };
 
         const teamColor = groupThemeColors[currentGroup] || "#C2185B";
@@ -292,6 +293,7 @@
                 bannerDiv.style.color = teamTextColor;
                 bannerDiv.querySelectorAll("div").forEach(el => el.style.color = teamTextColor);
             }
+            if(submitBtn) submitBtn.style.backgroundColor = teamColor;
             if(submitBtn) {
                 submitBtn.style.backgroundColor = teamColor;
                 submitBtn.style.color = teamTextColor;
@@ -318,20 +320,14 @@
                 .select('*')
                 .eq('category', cat);
             
-            if (error) { 
-                console.error(error); 
-                alert("Error loading programs: " + error.message);
-                return; 
-            }
+            if (error) { console.error(error); return; }
 
-            if (!allProgs || allProgs.length === 0) {
-                progSelect.innerHTML = '<option value="">No programs found in this category</option>';
-                return;
-            }
-
+            // 🔧 FIX: ഇതേ കാറ്റഗറിയിലെ registrations മാത്രം എണ്ണുന്നു
+            // (അതേ പേരുള്ള പ്രോഗ്രാം വേറെ കാറ്റഗറിയിൽ ഉണ്ടെങ്കിൽ അത് ബാധിക്കില്ല)
             const { data: groupParticipants } = await db.from('participants')
                 .select('program_id')
-                .eq('team_name', currentGroup);
+                .eq('team_name', currentGroup)
+                .eq('category', cat);
 
             const countByProg = {};
             (groupParticipants || []).forEach(p => {
@@ -339,17 +335,13 @@
             });
 
             (allProgs || []).forEach(p => {
-                let uniqueProgramKey = `${p.name} (${cat})`;
                 let maxLimit = p.chest_no_limit || 1;
-                let registeredCount = countByProg[uniqueProgramKey] || 0; 
-                let remaining = maxLimit - registeredCount;
+                let registeredCount = countByProg[p.name] || 0; 
 
-                let label = `${p.name} (Remaining Slots: ${remaining}/${maxLimit})`;
-                if (remaining <= 0) {
-                    label = `${p.name} (Fully Registered)`;
+                if (registeredCount < maxLimit) {
+                    let remaining = maxLimit - registeredCount;
+                    progSelect.innerHTML += `<option value="${p.name}" data-limit="${maxLimit}" data-registered="${registeredCount}">${p.name} (Remaining Slots: ${remaining}/${maxLimit})</option>`;
                 }
-
-                progSelect.innerHTML += `<option value="${p.name}" data-unique="${uniqueProgramKey}" data-limit="${maxLimit}" data-registered="${registeredCount}">${label}</option>`;
             });
         }
 
@@ -393,9 +385,6 @@
                 return;
             }
 
-            const selectedOpt = progSelect.options[progSelect.selectedIndex];
-            const uniqueProgramKey = selectedOpt.getAttribute("data-unique") || `${prog} (${cat})`;
-
             const nameInputs = document.querySelectorAll(".part-name-input");
             const chestInputs = document.querySelectorAll(".part-chest-input");
 
@@ -435,7 +424,8 @@
 
             const { data: existing, error: checkError } = await db.from('participants')
                 .select('chest_no')
-                .eq('program_id', uniqueProgramKey)
+                .eq('program_id', prog)
+                .eq('category', cat)
                 .in('chest_no', chestsToCheck);
             
             if (checkError) {
@@ -445,7 +435,7 @@
 
             if (existing && existing.length > 0) {
                 let dupChests = existing.map(e => e.chest_no).join(', ');
-                alert(`Chest number(s) ${dupChests} are already registered for program "${prog}" (${cat})!`);
+                alert(`Chest number(s) ${dupChests} are already registered for program "${prog}"!`);
                 return;
             }
 
@@ -457,7 +447,8 @@
                         name: name, 
                         chest_no: parseInt(chestStr), 
                         team_name: currentGroup, 
-                        program_id: uniqueProgramKey 
+                        program_id: prog,
+                        category: cat
                     });
                 }
             }
@@ -507,22 +498,24 @@
                 return;
             }
 
+            // 🔧 FIX: പ്രോഗ്രാം പേരും കാറ്റഗറിയും ചേർത്ത് ഗ്രൂപ്പ് ചെയ്യുന്നു
+            // (അതേ പേരുള്ള പ്രോഗ്രാം വേറെ കാറ്റഗറിയിൽ ഉണ്ടെങ്കിൽ വേറെ ആയി കാണിക്കാൻ)
             const grouped = {};
             entries.forEach(e => {
-                let key = e.program_id; 
-                if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(e);
+                let key = e.program_id + "___" + (e.category || "");
+                if (!grouped[key]) grouped[key] = { progName: e.program_id, cat: e.category, rows: [] };
+                grouped[key].rows.push(e);
             });
 
-            Object.keys(grouped).forEach(groupKey => {
-                let rows = grouped[groupKey];
-                let partListText = rows.map(p =>
+            Object.keys(grouped).forEach(key => {
+                let group = grouped[key];
+                let partListText = group.rows.map(p =>
                     `${p.name} <span style="color:var(--accent);">[Chest: ${p.chest_no}]</span> <button onclick="deleteParticipant(${p.id})" class="delete-part-btn">✕</button>`
                 ).join(", ");
 
                 container.innerHTML += `
                     <div class="leader-card">
-                        <h4 style="color:var(--accent); margin:0;">${groupKey}</h4>
+                        <h4 style="color:var(--accent); margin:0;">${group.progName} <span style="font-size:11px; color:#aaa;">(${group.cat || '-'})</span></h4>
                         <p style="font-size:13px; margin:5px 0;">Participants: ${partListText}</p>
                     </div>
                 `;
