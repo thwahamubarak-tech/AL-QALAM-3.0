@@ -64,10 +64,9 @@
             padding: 20px;
         }
 
-        /* Welcome Banner Design (Darker & Vibrant Colors) */
+        /* Welcome Banner Design */
         #welcomeBanner {
-            background-color: #C2185B !important
-            background-image: none !important;
+            background-color: var(--dynamic-color) !important;
             padding: 30px 15px !important;
             border-radius: 0 !important;
             border: none !important;
@@ -247,7 +246,7 @@
             </select>
 
             <label>Program</label>
-            <select id="leadProg" onchange="generateParticipantFields()" onclick="generateParticipantFields()">
+            <select id="leadProg" onchange="generateParticipantFields()">
                 <option value="">Select Program</option>
             </select>
 
@@ -267,17 +266,16 @@
 
         const currentGroup = localStorage.getItem("current_leader_group") || "Andalusian Legends";
         
-        // കുറച്ചുകൂടി ഡാർക്ക് ആൻഡ് വൈബ്രന്റ് ആക്കിയ കളർ കോഡുകൾ:
         const groupThemeColors = {
-            "Andalusian Legends": "#0284c7", // കൂടുതൽ ഡാർക്കായ ബ്ലൂ (Dark Sky Blue)
-            "Ottoman Titans": "#E91E63",     // കൂടുതൽ ഡാർക്കായ പിങ്ക്/പർപ്പിൾ ഷേഡ് (Vibrant Orchid/Pink)
-            "Baghdad Warriors": "#facc15"    // കൂടുതൽ വ്യക്തതയുള്ള ഡാർക്ക് മഞ്ഞ (Vibrant Yellow)
+            "Andalusian Legends": "#0284c7", 
+            "Ottoman Titans": "#E91E63",     
+            "Baghdad Warriors": "#facc15"    
         };
 
         const groupTextColors = {
             "Andalusian Legends": "#ffffff",
             "Ottoman Titans": "#ffffff",
-            "Baghdad Warriors": "#000000"    // മഞ്ഞയായതുകൊണ്ട് ടെക്സ്റ്റ് കറുപ്പ്
+            "Baghdad Warriors": "#000000"    
         };
 
         const teamColor = groupThemeColors[currentGroup] || "#C2185B";
@@ -294,7 +292,6 @@
                 bannerDiv.style.color = teamTextColor;
                 bannerDiv.querySelectorAll("div").forEach(el => el.style.color = teamTextColor);
             }
-            if(submitBtn) submitBtn.style.backgroundColor = teamColor;
             if(submitBtn) {
                 submitBtn.style.backgroundColor = teamColor;
                 submitBtn.style.color = teamTextColor;
@@ -321,7 +318,16 @@
                 .select('*')
                 .eq('category', cat);
             
-            if (error) { console.error(error); return; }
+            if (error) { 
+                console.error(error); 
+                alert("Error loading programs: " + error.message);
+                return; 
+            }
+
+            if (!allProgs || allProgs.length === 0) {
+                progSelect.innerHTML = '<option value="">No programs found in this category</option>';
+                return;
+            }
 
             const { data: groupParticipants } = await db.from('participants')
                 .select('program_id')
@@ -333,13 +339,17 @@
             });
 
             (allProgs || []).forEach(p => {
+                let uniqueProgramKey = `${p.name} (${cat})`;
                 let maxLimit = p.chest_no_limit || 1;
-                let registeredCount = countByProg[p.name] || 0; 
+                let registeredCount = countByProg[uniqueProgramKey] || 0; 
+                let remaining = maxLimit - registeredCount;
 
-                if (registeredCount < maxLimit) {
-                    let remaining = maxLimit - registeredCount;
-                    progSelect.innerHTML += `<option value="${p.name}" data-limit="${maxLimit}" data-registered="${registeredCount}">${p.name} (Remaining Slots: ${remaining}/${maxLimit})</option>`;
+                let label = `${p.name} (Remaining Slots: ${remaining}/${maxLimit})`;
+                if (remaining <= 0) {
+                    label = `${p.name} (Fully Registered)`;
                 }
+
+                progSelect.innerHTML += `<option value="${p.name}" data-unique="${uniqueProgramKey}" data-limit="${maxLimit}" data-registered="${registeredCount}">${label}</option>`;
             });
         }
 
@@ -383,6 +393,9 @@
                 return;
             }
 
+            const selectedOpt = progSelect.options[progSelect.selectedIndex];
+            const uniqueProgramKey = selectedOpt.getAttribute("data-unique") || `${prog} (${cat})`;
+
             const nameInputs = document.querySelectorAll(".part-name-input");
             const chestInputs = document.querySelectorAll(".part-chest-input");
 
@@ -422,7 +435,7 @@
 
             const { data: existing, error: checkError } = await db.from('participants')
                 .select('chest_no')
-                .eq('program_id', prog)
+                .eq('program_id', uniqueProgramKey)
                 .in('chest_no', chestsToCheck);
             
             if (checkError) {
@@ -432,7 +445,7 @@
 
             if (existing && existing.length > 0) {
                 let dupChests = existing.map(e => e.chest_no).join(', ');
-                alert(`Chest number(s) ${dupChests} are already registered for program "${prog}"!`);
+                alert(`Chest number(s) ${dupChests} are already registered for program "${prog}" (${cat})!`);
                 return;
             }
 
@@ -444,7 +457,7 @@
                         name: name, 
                         chest_no: parseInt(chestStr), 
                         team_name: currentGroup, 
-                        program_id: prog 
+                        program_id: uniqueProgramKey 
                     });
                 }
             }
@@ -496,19 +509,20 @@
 
             const grouped = {};
             entries.forEach(e => {
-                if (!grouped[e.program_id]) grouped[e.program_id] = [];
-                grouped[e.program_id].push(e);
+                let key = e.program_id; 
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(e);
             });
 
-            Object.keys(grouped).forEach(progName => {
-                let rows = grouped[progName];
+            Object.keys(grouped).forEach(groupKey => {
+                let rows = grouped[groupKey];
                 let partListText = rows.map(p =>
                     `${p.name} <span style="color:var(--accent);">[Chest: ${p.chest_no}]</span> <button onclick="deleteParticipant(${p.id})" class="delete-part-btn">✕</button>`
                 ).join(", ");
 
                 container.innerHTML += `
                     <div class="leader-card">
-                        <h4 style="color:var(--accent); margin:0;">${progName}</h4>
+                        <h4 style="color:var(--accent); margin:0;">${groupKey}</h4>
                         <p style="font-size:13px; margin:5px 0;">Participants: ${partListText}</p>
                     </div>
                 `;
