@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launch · AL QALAM 3.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0b0b0b;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        .launch-wrapper {
+            text-align: center;
+            z-index: 10;
+            position: relative;
+        }
+
+        .main-title {
+            font-size: 52px;
+            font-weight: 900;
+            color: #D4AF37;
+            letter-spacing: 4px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 30px rgba(212,175,55,0.2);
+        }
+        .sub-title {
+            font-size: 18px;
+            letter-spacing: 8px;
+            color: #aaa;
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+
+        .launch-btn {
+            background: transparent;
+            border: 2px solid #D4AF37;
+            color: #D4AF37;
+            padding: 18px 55px;
+            font-size: 20px;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+            letter-spacing: 2px;
+        }
+        .launch-btn:hover {
+            background: #D4AF37;
+            color: #000;
+            box-shadow: 0 0 40px rgba(212,175,55,0.4);
+            transform: scale(1.05);
+        }
+
+        /* White Overlay */
+        #whiteOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #ffffff;
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Narrow track for segments */
+        .segment-track {
+            width: 60%;
+            max-width: 400px;
+            height: 12px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            display: flex;
+            gap: 4px;
+            padding: 2px;
+            overflow: hidden;
+        }
+
+        /* Individual segment blocks */
+        .seg-block {
+            flex: 1;
+            height: 100%;
+            background: #D4AF37;
+            border-radius: 2px;
+            opacity: 0;
+            transform: scaleX(0.6);
+            transition: all 0.3s ease;
+        }
+
+        .seg-block.active {
+            opacity: 1;
+            transform: scaleX(1);
+        }
+
+        @media (max-width: 600px) {
+            .main-title { font-size: 34px; }
+            .sub-title { font-size: 14px; }
+            .launch-btn { padding: 14px 40px; font-size: 18px; }
+            .segment-track { width: 85%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="launch-wrapper">
+        <div class="main-title">AL QALAM 3.0</div>
+        <div class="sub-title">THAIBA SCHOOL OF QURAN FESTIVAL</div>
+        <button class="launch-btn" onclick="startLaunch()">▶ START</button>
+    </div>
+
+    <div id="whiteOverlay">
+        <div class="segment-track" id="segmentTrack"></div>
+    </div>
+
+    <audio id="bismillahAudio" src="bismillah.mp3" preload="auto"></audio>
+
+    <script>
+        function startLaunch() {
+            document.querySelector('.launch-btn').disabled = true;
+            document.querySelector('.launch-btn').style.opacity = '0.5';
+
+            const overlay = document.getElementById('whiteOverlay');
+            const track = document.getElementById('segmentTrack');
+            
+            // ബ്ലോക്കുകൾ ഡൈനാമിക് ആയി ഉണ്ടാക്കുന്നു (10 ബ്ലോക്കുകൾ)
+            const totalSegments = 10;
+            for (let i = 0; i < totalSegments; i++) {
+                const block = document.createElement('div');
+                block.className = 'seg-block';
+                track.appendChild(block);
+            }
+
+            overlay.style.display = 'flex';
+
+            setTimeout(() => {
+                const audio = document.getElementById('bismillahAudio');
+                if (audio) audio.play().catch(e => console.log("Audio error:", e));
+            }, 100);
+
+            // ഓരോ 1 സെക്കൻഡിലും ഒരു ബ്ലോക്ക് ആക്റ്റിവേറ്റ് ആകും
+            const blocks = document.querySelectorAll('.seg-block');
+            let currentIndex = 0;
+
+            const interval = setInterval(() => {
+                if (currentIndex < blocks.length) {
+                    blocks[currentIndex].classList.add('active');
+                    currentIndex++;
+                } else {
+                    clearInterval(interval);
+                    // 10 സെക്കൻഡ് കഴിഞ്ഞ് index.html ലേക്ക് പോകും
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 300);
+                }
+            }, 1000); // 1 സെക്കൻഡ് ഇടവേള
+        }
+    </script>
+
+</body>
+</html>
