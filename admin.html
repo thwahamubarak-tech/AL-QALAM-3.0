@@ -875,32 +875,43 @@ if (judgeName && judgeName.startsWith('Manual Entry:')) {
         }
 
         async function renderLeaderEntries(groupName) {
-            const { data: entries, error } = await window.dbClient.from('participants').select('*').eq('team_name', groupName);
-            if (error) { console.error(error); return; }
-            const container = document.getElementById('leaderEntriesContent');
-            if (!entries || entries.length === 0) { container.innerHTML = `<div class="result-group-box"><p style="color:#aaa; text-align:center; margin:10px 0;">No entries found for ${groupName}.</p></div>`; return; }
-            const { data: allProgs } = await window.dbClient.from('programs').select('name, category');
-            const catMap = {}; (allProgs || []).forEach(p => { catMap[p.name] = p.category; });
-            let html = `<h4 style="color:#D4AF37; border-bottom:1px solid #444; padding-bottom:5px;">Entries for ${groupName}</h4>`;
-            const categories = ['Junior', 'Senior', 'General'];
-            categories.forEach(cat => {
-                const catEntries = entries.filter(e => catMap[e.program_id] === cat);
-                html += `<div style="background:#1f1f1f; padding:10px; border-radius:6px; border:1px solid #333; margin-top:10px;"><h5 style="color:#D4AF37; margin:0 0 8px 0; font-size:14px; border-left:3px solid #800000; padding-left:8px;">${cat} Category</h5>`;
-                if (catEntries.length === 0) { html += `<p style="font-size:12px; color:#777; margin:5px 0;">No programs registered in this category.</p>`; }
-                else {
-                    const grouped = {};
-                    catEntries.forEach(e => { if (!grouped[e.program_id]) grouped[e.program_id] = []; grouped[e.program_id].push(e); });
-                    html += `<table><thead><tr><th>Program Name</th><th>Participants & Chest Numbers</th></tr></thead><tbody>`;
-                    Object.keys(grouped).forEach(progName => {
-                        let partsText = grouped[progName].map(p => `${p.name} <span style="color:#D4AF37;">(${p.chest_no})</span>`).join(", ");
-                        html += `<tr><td style="font-weight:bold; width:40%;">${progName}</td><td>${partsText}</td></tr>`;
-                    });
-                    html += `</tbody></table>`;
-                }
-                html += `</div>`;
-            });
-            container.innerHTML = html;
+    const { data: entries, error } = await window.dbClient.from('participants').select('*').eq('team_name', groupName);
+    if (error) { console.error(error); return; }
+    const container = document.getElementById('leaderEntriesContent');
+    if (!entries || entries.length === 0) { container.innerHTML = `<div class="result-group-box"><p style="color:#aaa; text-align:center; margin:10px 0;">No entries found for ${groupName}.</p></div>`; return; }
+    
+    const { data: allProgs } = await window.dbClient.from('programs').select('name, category');
+    const catMap = {}; (allProgs || []).forEach(p => { catMap[p.name] = p.category; });
+    
+    let html = `<h4 style="color:#D4AF37; border-bottom:1px solid #444; padding-bottom:5px;">Entries for ${groupName}</h4>`;
+    const categories = ['Junior', 'Senior', 'General'];
+    
+    categories.forEach(cat => {
+        // 🔥 ഇവിടെ പ്രധാന മാറ്റം: 'catMap' എന്നതിന് പകരം പുതിയ 'category' കോളം ഉപയോഗിക്കുന്നു
+        const catEntries = entries.filter(e => e.category === cat);
+        
+        html += `<div style="background:#1f1f1f; padding:10px; border-radius:6px; border:1px solid #333; margin-top:10px;"><h5 style="color:#D4AF37; margin:0 0 8px 0; font-size:14px; border-left:3px solid #800000; padding-left:8px;">${cat} Category</h5>`;
+        if (catEntries.length === 0) { 
+            html += `<p style="font-size:12px; color:#777; margin:5px 0;">No programs registered in this category.</p>`; 
         }
+        else {
+            const grouped = {};
+            catEntries.forEach(e => { 
+                // 🔥 ഇവിടെ group ചെയ്യാൻ 'program_id' (അതായത് പ്രോഗ്രാം പേര്) ഉപയോഗിക്കുന്നു
+                if (!grouped[e.program_id]) grouped[e.program_id] = []; 
+                grouped[e.program_id].push(e); 
+            });
+            html += `<table><thead><tr><th>Program Name</th><th>Participants & Chest Numbers</th></tr></thead><tbody>`;
+            Object.keys(grouped).forEach(progName => {
+                let partsText = grouped[progName].map(p => `${p.name} <span style="color:#D4AF37;">(${p.chest_no})</span>`).join(", ");
+                html += `<tr><td style="font-weight:bold; width:40%;">${progName}</td><td>${partsText}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+        html += `</div>`;
+    });
+    container.innerHTML = html;
+}
 
         let currentMasterCat = 'Junior';
         function switchMasterCategory(catName) {
