@@ -924,31 +924,44 @@ if (judgeName && judgeName.startsWith('Manual Entry:')) {
         }
 
         async function renderMasterCategoryView(catName) {
-            const container = document.getElementById('masterProgContent');
-            if (!container) return;
-            const { data: allProgs } = await window.dbClient.from('programs').select('*').eq('category', catName);
-            const { data: allEntries } = await window.dbClient.from('participants').select('*');
-            if (!allProgs || allProgs.length === 0) { container.innerHTML = '<div class="result-group-box"><p style="color:#aaa; text-align:center; margin:10px 0;">No programs found in ' + catName + ' category.</p></div>'; return; }
-            let html = '<h4 style="color:#D4AF37; border-bottom:1px solid #444; padding-bottom:5px;">' + catName + ' Category - All Programs & Participants</h4>';
-            html += '<table><thead><tr><th style="width: 35%;">Program Name</th><th style="width: 65%;">Participants (Name, Chest No & Group)</th></tr></thead><tbody id="masterTableBody">';
-            for (var i = 0; i < allProgs.length; i++) {
-                var prog = allProgs[i];
-                var progEntries = (allEntries || []).filter(function(e) { return e.program_id && e.program_id.trim().toLowerCase() === prog.name.trim().toLowerCase(); });
-                let participantDetails = [];
-                if (progEntries.length > 0) {
-                    for (var j = 0; j < progEntries.length; j++) {
-                        var entry = progEntries[j];
-                        if(entry.name && entry.name.trim() !== "") {
-                            participantDetails.push(`${entry.name} <span style="color:#D4AF37;">(Chest: ${entry.chest_no})</span> - <b style="color:#fff;">${entry.team_name || 'N/A'}</b>`);
-                        }
-                    }
+    const container = document.getElementById('masterProgContent');
+    if (!container) return;
+    const { data: allProgs } = await window.dbClient.from('programs').select('*').eq('category', catName);
+    
+    // 🔥 ഇവിടെ പ്രധാന മാറ്റം: participants എടുക്കുമ്പോൾ category കൂടി eq ചെയ്യുന്നു
+    const { data: allEntries } = await window.dbClient.from('participants')
+        .select('*')
+        .eq('category', catName);
+    
+    if (!allProgs || allProgs.length === 0) { container.innerHTML = '<div class="result-group-box"><p style="color:#aaa; text-align:center; margin:10px 0;">No programs found in ' + catName + ' category.</p></div>'; return; }
+    
+    let html = '<h4 style="color:#D4AF37; border-bottom:1px solid #444; padding-bottom:5px;">' + catName + ' Category - All Programs & Participants</h4>';
+    html += '<table><thead><tr><th style="width: 35%;">Program Name</th><th style="width: 65%;">Participants (Name, Chest No & Group)</th></tr></thead><tbody id="masterTableBody">';
+    
+    for (var i = 0; i < allProgs.length; i++) {
+        var prog = allProgs[i];
+        
+        // 🔥 ഇവിടെ filter ചെയ്യുമ്പോൾ program_id (പേര്) മാത്രമല്ല, category ഉം കൂടി ഫിൽട്ടർ ചെയ്യുന്നു
+        // ഇത് ഇതിനകം ഡാറ്റാബേസിൽ eq ചെയ്തതുകൊണ്ട്, ഇവിടെ program_id കൊണ്ട് മാത്രം ഫിൽട്ടർ ചെയ്താൽ മതി.
+        var progEntries = (allEntries || []).filter(function(e) { 
+            return e.program_id && e.program_id.trim().toLowerCase() === prog.name.trim().toLowerCase(); 
+        });
+        
+        let participantDetails = [];
+        if (progEntries.length > 0) {
+            for (var j = 0; j < progEntries.length; j++) {
+                var entry = progEntries[j];
+                if(entry.name && entry.name.trim() !== "") {
+                    participantDetails.push(`${entry.name} <span style="color:#D4AF37;">(Chest: ${entry.chest_no})</span> - <b style="color:#fff;">${entry.team_name || 'N/A'}</b>`);
                 }
-                let participantsText = participantDetails.length > 0 ? participantDetails.join(", ") : 'No entries yet';
-                html += '<tr><td style="font-weight:bold; color:#fff;">' + prog.name + '</td><td>' + participantsText + '</td></tr>';
             }
-            html += '</tbody></table>';
-            container.innerHTML = html;
         }
+        let participantsText = participantDetails.length > 0 ? participantDetails.join(", ") : 'No entries yet';
+        html += '<tr><td style="font-weight:bold; color:#fff;">' + prog.name + '</td><td>' + participantsText + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
         async function renderCodeAllocations() {
             const { data: list, error } = await window.dbClient.from('code_letters').select('*');
             if (error) { console.error(error); return; }
