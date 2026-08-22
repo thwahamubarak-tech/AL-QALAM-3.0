@@ -42,8 +42,15 @@
             const catMap = {};
             (programs || []).forEach(p => { catMap[p.name] = p.category; });
 
+            // 🔥 ഇപ്പോൾ partMap-ൽ chest_no + program_id മാത്രമല്ല, category കൂടി ഉൾപ്പെടുത്തുന്നു
             const partMap = {};
-            (participants || []).forEach(p => { partMap[String(p.chest_no).trim() + "_" + p.program_id] = p; });
+            (participants || []).forEach(p => { 
+                partMap[String(p.chest_no).trim() + "_" + p.program_id] = { 
+                    name: p.name, 
+                    group: p.team_name || p.group_name || '-', 
+                    category: p.category || 'General' 
+                }; 
+            });
 
             // ഇതിനകം judge ചെയ്ത (chest_no + program) combinations
             const markedSet = new Set();
@@ -63,19 +70,22 @@
                 return;
             }
 
-            // പ്രോഗ്രാം അനുസരിച്ച് ഗ്രൂപ്പ് ചെയ്യുന്നു
+            // 🔥 ഇപ്പോൾ പ്രോഗ്രാം ഗ്രൂപ്പ് ചെയ്യുമ്പോൾ partMap-ൽ നിന്ന് category എടുക്കുന്നു
             const groupedMap = {};
             pending.forEach(c => {
-                const key = c.program_name;
+                const pInfo = partMap[String(c.chest_no).trim() + "_" + c.program_name] || { category: 'General' };
+                const key = c.program_name + "|" + pInfo.category;
                 if (!groupedMap[key]) {
-                    groupedMap[key] = { prog: c.program_name, cat: catMap[c.program_name] || '', items: [] };
+                    groupedMap[key] = { 
+                        prog: c.program_name, 
+                        cat: pInfo.category, 
+                        items: [] 
+                    };
                 }
-                const p = partMap[String(c.chest_no).trim() + "_" + c.program_name] || {};
                 groupedMap[key].items.push({
                     code: c.code_letter,
                     chestNo: c.chest_no,
-                    name: p.name || '-',
-                    group: p.team_name || '-'
+                    programName: c.program_name
                 });
             });
 
@@ -113,6 +123,7 @@
                     `;
                 });
 
+                // ✅ പ്രോഗ്രാം പേരിനൊപ്പം Category ഉം പ്രദർശിപ്പിക്കുന്നു
                 container.innerHTML += `
                     <div class="schedule-item" style="border:1px solid var(--accent); padding:12px; margin-bottom:15px; border-radius:6px; background:#1a1a1a;">
                         <h3 style="color:var(--accent); margin:0 0 8px 0; font-size:15px;">${groupObj.prog} (${groupObj.cat})</h3>
@@ -131,31 +142,91 @@
             window._judgeGroupKeys = groupKeys;
         }
 
-        // --- 2. മെഡൽ കണക്കാക്കാൻ ---
-        function calculateWinners(groupIdx, totalCandidates) {
-            let scoresList = [];
-            for(let i = 0; i < totalCandidates; i++) {
-                let markInput = document.getElementById(`j_mark_${groupIdx}_${i}`);
-                let mark = markInput && markInput.value !== "" ? parseFloat(markInput.value) : -1;
-                scoresList.push({ index: i, mark: mark });
-            }
+        // --- 2. 🥇🥈🥉 ഒരേ മാർക്ക് ഉള്ളവർക്ക് ഒരേ റാങ്ക് നൽകുന്നു ---
+        // --- 2. 🥇🥈🥉 Same marks = same rank, but next rank continues normally ---
+function calculateWinners(groupIdx, totalCandidates) {
 
-            scoresList.sort((a, b) => b.mark - a.mark);
+    let scoresList = [];
 
-            for(let i = 0; i < totalCandidates; i++) {
-                let badgeSpan = document.getElementById(`badge_${groupIdx}_${i}`);
-                if(badgeSpan) badgeSpan.innerHTML = "";
-            }
+    for (let i = 0; i < totalCandidates; i++) {
 
-            let validScores = scoresList.filter(s => s.mark >= 0);
-            if(validScores.length > 0 && validScores[0].mark >= 0) {
-                if(validScores[0]) document.getElementById(`badge_${groupIdx}_${validScores[0].index}`).innerHTML = `<span style="font-size:24px;">🥇</span>`;
-                if(validScores[1] && validScores[1].mark >= 0) document.getElementById(`badge_${groupIdx}_${validScores[1].index}`).innerHTML = `<span style="font-size:24px;">🥈</span>`;
-                if(validScores[2] && validScores[2].mark >= 0) document.getElementById(`badge_${groupIdx}_${validScores[2].index}`).innerHTML = `<span style="font-size:24px;">🥉</span>`;
-            }
+        let markInput = document.getElementById(
+            `j_mark_${groupIdx}_${i}`
+        );
+
+        let mark =
+            markInput && markInput.value !== ""
+                ? parseFloat(markInput.value)
+                : -1;
+
+        scoresList.push({
+            index: i,
+            mark: mark
+        });
+    }
+
+    // Highest marks first
+    scoresList.sort((a, b) => b.mark - a.mark);
+
+    // Clear all medals first
+    for (let i = 0; i < totalCandidates; i++) {
+
+        let badgeSpan = document.getElementById(
+            `badge_${groupIdx}_${i}`
+        );
+
+        if (badgeSpan) {
+            badgeSpan.innerHTML = "";
+        }
+    }
+
+    // Dense ranking:
+    // 800 = 1st
+    // 500 = 2nd
+    // 500 = 2nd
+    // 300 = 3rd
+
+    let currentRank = 0;
+    let lastMark = null;
+
+    for (let i = 0; i < scoresList.length; i++) {
+
+        let s = scoresList[i];
+
+        // Ignore empty marks
+        if (s.mark < 0) {
+            continue;
         }
 
-        // --- 3. മാർക്ക് സബ്മിറ്റ് ചെയ്യുക (Supabase marks table-ലേക്ക്) ---
+        // Only increase rank when mark changes
+        if (lastMark === null || s.mark !== lastMark) {
+            currentRank++;
+            lastMark = s.mark;
+        }
+
+        let badge = document.getElementById(
+            `badge_${groupIdx}_${s.index}`
+        );
+
+        if (!badge) continue;
+
+        if (currentRank === 1) {
+
+            badge.innerHTML =
+                `<span style="font-size:24px;">🥇</span>`;
+
+        } else if (currentRank === 2) {
+
+            badge.innerHTML =
+                `<span style="font-size:24px;">🥈</span>`;
+
+        } else if (currentRank === 3) {
+
+            badge.innerHTML =
+                `<span style="font-size:24px;">🥉</span>`;
+        }
+    }
+}
         async function submitJudgeResult(groupIdx) {
             const groupKeys = window._judgeGroupKeys;
             const groupedMap = window._judgeGroupCache;
@@ -197,13 +268,15 @@
                 const markVal = markEl ? markEl.value : "";
                 const mark = markVal !== "" ? parseFloat(markVal) : 0;
 
+                // ✅ ഇവിടെ category ഉൾപ്പെടുത്തി
                 markRows.push({
                     program_name: groupObj.prog,
                     chest_no: c.chestNo,
                     mark: mark,
                     grade: grade,
                     status: 'Pending',
-                    judge_name: judgeName
+                    judge_name: judgeName,
+                    category: groupObj.cat
                 });
             });
 

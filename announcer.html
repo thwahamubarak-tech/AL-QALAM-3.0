@@ -38,132 +38,146 @@
         document.addEventListener("DOMContentLoaded", renderAnnouncerDesk);
 
         async function renderAnnouncerDesk() {
-            // 'marks' ടേബിളിൽ നിന്ന് 'Approved' ആയ റിസൾട്ടുകൾ എടുക്കുന്നു
-            const { data: marksList, error: marksErr } = await db.from('marks').select('*').eq('status', 'Approved');
+    const { data: marksList, error: marksErr } = await db.from('marks').select('*').eq('status', 'Approved');
+    if (marksErr) {
+        console.error(marksErr);
+        document.getElementById("announcerQueueList").innerHTML = `<p style='color:red;'>Error fetching data: ${marksErr.message}</p>`;
+        return;
+    }
+    let list = marksList || [];
+    const container = document.getElementById("announcerQueueList");
+    container.innerHTML = "";
+    if (!list || list.length === 0) {
+        container.innerHTML = "<p style='color:#888;'>No pending results for announcement.</p>";
+        return;
+    }
+    const { data: programsData } = await db.from('programs').select('name, category');
+    const catMap = {};
+    (programsData || []).forEach(p => { catMap[p.name] = p.category; });
+    const { data: participants } = await db.from('participants').select('chest_no, name, team_name, program_id');
+    const partMap = {};
+    (participants || []).forEach(p => {
+        let cleanProgId = String(p.program_id || '').trim().toLowerCase();
+        let cleanChest = String(p.chest_no || '').trim();
+        partMap[cleanChest + "_" + cleanProgId] = p;
+    });
 
-            if (marksErr) {
-                console.error(marksErr);
-                document.getElementById("announcerQueueList").innerHTML = `<p style='color:red;'>Error fetching data: ${marksErr.message}</p>`;
-                return;
+    // ✅ ഗ്രൂപ്പ് ചെയ്യാൻ program_name + category ഉപയോഗിക്കുന്നു
+    const groupedData = {};
+    list.forEach(item => {
+        const cat = item.category || catMap[item.program_name] || 'General';
+        const key = (item.program_name || item.program) + "|" + cat;
+        if (!groupedData[key]) groupedData[key] = [];
+        groupedData[key].push(item);
+    });
+
+    for (const fullKey in groupedData) {
+        const progMarks = groupedData[fullKey];
+        progMarks.sort((a, b) => (b.mark || 0) - (a.mark || 0));
+        const [progName, category] = fullKey.split('|');
+
+        // ✅ ഇത് മുതൽ പുതിയ ലോജിക്: ഒരേ മാർക്ക് ഉള്ളവർക്ക് ഒരേ റാങ്ക്, 1st/2nd/3rd റാങ്കുകളിൽ ഉള്ള എല്ലാവരെയും കാണിക്കും
+        let topEntries = [];
+        let lastMark = null;
+        let rank = 0;
+
+        for (let i = 0; i < progMarks.length; i++) {
+            if (progMarks[i].mark < 0) continue;
+            if (lastMark === null || progMarks[i].mark !== lastMark) {
+                rank++;
+                lastMark = progMarks[i].mark;
             }
-
-            let list = marksList || [];
-
-            const container = document.getElementById("announcerQueueList");
-            container.innerHTML = "";
-
-            if (!list || list.length === 0) {
-                container.innerHTML = "<p style='color:#888;'>No pending results for announcement.</p>";
-                return;
-            }
-
-            // programs ടേബിളിൽ നിന്ന് കാറ്റഗറികൾ ഫെച്ച് ചെയ്യുന്നു
-            const { data: programsData } = await db.from('programs').select('name, category');
-            const catMap = {};
-            (programsData || []).forEach(p => { catMap[p.name] = p.category; });
-
-            // പേരും ഗ്രൂപ്പും കിട്ടാൻ participants table കൂടി എടുക്കുന്നു
-            const { data: participants } = await db.from('participants').select('chest_no, name, team_name, program_id');
-            const partMap = {};
-            (participants || []).forEach(p => {
-                let cleanProgId = String(p.program_id || '').trim().toLowerCase();
-                let cleanChest = String(p.chest_no || '').trim();
-                partMap[cleanChest + "_" + cleanProgId] = p;
-            });
-
-            const groupedData = {};
-            list.forEach(item => {
-                const key = item.program_name || item.program;
-                if (!groupedData[key]) groupedData[key] = [];
-                groupedData[key].push(item);
-            });
-
-            for (const progName in groupedData) {
-                const progMarks = groupedData[progName];
-                progMarks.sort((a, b) => (b.mark || 0) - (a.mark || 0));
-
-                const category = catMap[progName] || progMarks[0].category || 'General';
-                const top3 = progMarks.slice(0, 3);
-                const medals = ['🥇', '🥈', '🥉'];
-
-                let winnersHtml = '';
-                top3.forEach((p, idx) => {
-                    let cleanProgName = String(progName || '').trim().toLowerCase();
-                    let cleanChest = String(p.chest_no || '').trim();
-                    const pInfo = partMap[cleanChest + "_" + cleanProgName] || {};
-                    
-                    let studentName = 'Chest ' + p.chest_no;
-                    let groupName = pInfo.team_name || '-';
-                    
-                    if (p.judge_name && p.judge_name.startsWith('Manual Entry:')) {
-                        let parts = p.judge_name.replace('Manual Entry:', '').trim().split('(');
-                        studentName = parts[0].trim();
-                        if (parts[1]) {
-                            groupName = parts[1].replace(')', '').trim();
-                        }
-                    } else {
-                        studentName = pInfo.name || p.name || ('Chest ' + p.chest_no);
-                    }
-
-                    let gradeVal = p.grade || '-';
-                    let ptsVal = p.mark || '0';
-
-                    winnersHtml += `
-                        <div style="background:#222; border:1px solid #444; border-radius:6px; padding:10px; margin-bottom:6px;">
-                            <div style="display:flex; align-items:center; gap:8px; color:#fff;">
-                                <span style="font-size:18px;">${medals[idx]}</span>
-                                <span style="font-size:15px; font-weight:bold;">${studentName} (Chest: ${p.chest_no})</span>
-                                <span style="color:#D4AF37; font-size:12px;">[Group: ${groupName}]</span>
-                                <span style="color:#ffeb3b; font-size:13px;">(Grade: ${gradeVal} | Pts: ${ptsVal})</span>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                container.innerHTML += `
-                    <div class="ann-card" style="background:#1a1a1a; border:1px solid var(--accent); border-radius:8px; padding:15px; margin-bottom:15px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px; margin-bottom:10px;">
-                            <span style="font-size:18px; font-weight:bold; color:var(--accent);">${progName}</span>
-                            <span style="background:#333; color:#ffeb3b; padding:3px 8px; border-radius:4px; font-size:12px; border:1px solid #555;">Category: ${category}</span>
-                        </div>
-                        <div style="font-size:12px; color:#aaa; margin-bottom:8px;">Judge/Source: ${progMarks[0]?.judge_name || 'Unknown'}</div>
-                        <div>${winnersHtml}</div>
-                        <button onclick="markAsAnnounced('${progName.replace(/'/g, "\\'")}')" style="width:100%; margin-top:10px; background:#28a745; border:none; padding:10px; font-weight:bold; cursor:pointer; font-size:14px; border-radius:5px; color:#fff;">
-                            ✅ Mark as Announced
-                        </button>
-                    </div>
-                `;
+            if (rank <= 3) {
+                topEntries.push({ ...progMarks[i], _rank: rank });
+            } else {
+                break;
             }
         }
 
-   async function markAsAnnounced(programName) {
-    const { data: records, error: fetchErr } = await db.from('marks')
-        .select('id')
-        .eq('program_name', programName);
-    
-    if (fetchErr) {
-        alert('Error: ' + fetchErr.message);
-        return;
-    }
+        const medals = ['🥇', '🥈', '🥉'];
+        let winnersHtml = '';
+        topEntries.forEach((p, idx) => {
+            let cleanProgName = String(progName || '').trim().toLowerCase();
+            let cleanChest = String(p.chest_no || '').trim();
+            const pInfo = partMap[cleanChest + "_" + cleanProgName] || {};
+            let studentName = 'Chest ' + p.chest_no;
+            let groupName = pInfo.team_name || '-';
+            if (p.judge_name && p.judge_name.startsWith('Manual Entry:')) {
+                let parts = p.judge_name.replace('Manual Entry:', '').trim().split('(');
+                studentName = parts[0].trim();
+                if (parts[1]) {
+                    groupName = parts[1].replace(')', '').trim();
+                }
+            } else {
+                studentName = pInfo.name || p.name || ('Chest ' + p.chest_no);
+            }
+            let gradeVal = p.grade || '-';
+            let ptsVal = p.mark || '0';
 
-    if (!records || records.length === 0) {
-        alert('No records found for this program!');
-        return;
-    }
+            // ✅ റാങ്ക് അനുസരിച്ച് മെഡൽ കാണിക്കുന്നു
+            let medal = '';
+            if (p._rank === 1) medal = medals[0];
+            else if (p._rank === 2) medal = medals[1];
+            else if (p._rank === 3) medal = medals[2];
 
-    for (let rec of records) {
-        await db.from('marks')
-            .update({ status: 'Announced' })
-            .eq('id', rec.id);
-    }
+            winnersHtml += `
+                <div style="background:#222; border:1px solid #444; border-radius:6px; padding:10px; margin-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:8px; color:#fff;">
+                        <span style="font-size:18px;">${medal}</span>
+                        <span style="font-size:15px; font-weight:bold;">${studentName} (Chest: ${p.chest_no})</span>
+                        <span style="color:#D4AF37; font-size:12px;">[Group: ${groupName}]</span>
+                        <span style="color:#ffeb3b; font-size:13px;">(Grade: ${gradeVal} | Pts: ${ptsVal})</span>
+                    </div>
+                </div>
+            `;
+        });
 
-    alert('Marked as Announced Successfully!');
-    if (typeof renderAnnounceDesk === 'function') {
-        renderAnnounceDesk();
-    } else {
-        location.reload();
+        container.innerHTML += `
+            <div class="ann-card" style="background:#1a1a1a; border:1px solid var(--accent); border-radius:8px; padding:15px; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px; margin-bottom:10px;">
+                    <span style="font-size:18px; font-weight:bold; color:var(--accent);">${progName}</span>
+                    <span style="background:#333; color:#ffeb3b; padding:3px 8px; border-radius:4px; font-size:12px; border:1px solid #555;">Category: ${category}</span>
+                </div>
+                <div style="font-size:12px; color:#aaa; margin-bottom:8px;">Judge/Source: ${progMarks[0]?.judge_name || 'Unknown'}</div>
+                <div>${winnersHtml}</div>
+                <button onclick="markAsAnnounced('${progName.replace(/'/g, "\\'")}', '${category.replace(/'/g, "\\'")}')" style="width:100%; margin-top:10px; background:#28a745; border:none; padding:10px; font-weight:bold; cursor:pointer; font-size:14px; border-radius:5px; color:#fff;">
+                    ✅ Mark as Announced
+                </button>
+            </div>
+        `;
     }
 }
+
+        async function markAsAnnounced(programName, category) {
+            const { data: records, error: fetchErr } = await db.from('marks')
+                .select('id')
+                .eq('program_name', programName)
+                .eq('category', category)   // ✅ ഇത് കൂടി ചേർക്കുക
+                .eq('status', 'Approved');   // ✅ ആപ്പ്രൂവ് ചെയ്തവ മാത്രം
+
+            if (fetchErr) {
+                alert('Error: ' + fetchErr.message);
+                return;
+            }
+
+            if (!records || records.length === 0) {
+                alert('No records found for this program!');
+                return;
+            }
+
+            for (let rec of records) {
+                await db.from('marks')
+                    .update({ status: 'Announced' })
+                    .eq('id', rec.id);
+            }
+
+            alert('Marked as Announced Successfully!');
+            if (typeof renderAnnounceDesk === 'function') {
+                renderAnnounceDesk();
+            } else {
+                location.reload();
+            }
+        }
     </script>
 
 </body>

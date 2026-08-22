@@ -225,91 +225,23 @@ box-sizing: border-box;
         }
 
         // --- 1. ഗ്രൂപ്പ് സ്കോർ അപ്ഡേറ്റ് ചെയ്യുക ---
-async function updateScores() {
-    // ആദ്യം എല്ലാ ടീമുകളുടെയും സ്കോർ 0 ആക്കുക
-    let scores = { 
-        "Andalusian Legends": 0, 
-        "Ottoman Titans": 0, 
-        "Baghdad Warriors": 0 
-    };
-
-    try {
-        // ✅ 1. പങ്കെടുക്കുന്നവരെ എടുക്കുക (chest_no -> team_name കണ്ടെത്താൻ)
-        const { data: participants } = await db.from('participants').select('chest_no, team_name');
-        const chestToTeam = {};
-        (participants || []).forEach(p => {
-            chestToTeam[String(p.chest_no).trim()] = p.team_name;
-        });
-
-        // ✅ 2. ഇപ്പോൾ is_published true ഉള്ള റെക്കോർഡുകൾ മാത്രം എടുക്കുക
-        const { data: marks, error } = await db.from('marks')
-            .select('*')
-            .eq('is_published', true);
-
-        if (error) { console.error("Score update error:", error); }
-
-        // ✅ 3. ഓരോ റെക്കോർഡിനും സ്കോർ കൂട്ടുക
-        (marks || []).forEach(m => {
-            // chest_no വഴി team_name കണ്ടെത്തുക
-            let chest = String(m.chest_no || '').trim();
-            let team = chestToTeam[chest] || null;
-
-            // അഡ്മിനിൽ Manual Entry ആണെങ്കിൽ, ടീം പേര് എവിടെയോ ഉണ്ടാകും
-            if (!team && m.judge_name && m.judge_name.startsWith('Manual Entry:')) {
-                let parts = m.judge_name.replace('Manual Entry:', '').trim().split('(');
-                if (parts[1]) {
-                    let extractedTeam = parts[1].replace(')', '').trim();
-                    if (scores.hasOwnProperty(extractedTeam)) {
-                        team = extractedTeam;
-                    }
-                }
-            }
-
-            // ടീം കിട്ടിയാൽ, മാർക്ക് കൂട്ടുക
-            if (team && scores.hasOwnProperty(team)) {
-                let mark = Number(m.mark) || 0;
-                scores[team] += mark;
-            }
-        });
-
-    } catch(e) { console.error(e); }
-
-    // ✅ 4. യുഐ അപ്ഡേറ്റ് ചെയ്യുക
-    let elAnd = document.getElementById('scoreAndalusian');
-    if(elAnd) elAnd.innerText = scores["Andalusian Legends"];
-
-    let elOtt = document.getElementById('scoreOttoman');
-    if(elOtt) elOtt.innerText = scores["Ottoman Titans"];
-
-    let elBag = document.getElementById('scoreBaghdad');
-    if(elBag) elBag.innerText = scores["Baghdad Warriors"];
-
-    // ✅ 5. റാങ്ക് അനുസരിച്ച് ബാഡ്ജുകൾ ക്രമീകരിക്കുക
-    let groupArray = [ 
-        { id: 'Andalusian', name: 'Andalusian Legends', score: scores["Andalusian Legends"] }, 
-        { id: 'Ottoman', name: 'Ottoman Titans', score: scores["Ottoman Titans"] }, 
-        { id: 'Baghdad', name: 'Baghdad Warriors', score: scores["Baghdad Warriors"] } 
-    ];
-    groupArray.sort((a, b) => b.score - a.score);
-
-    const rankDetails = [ 
-        { badge: '1st Place', color: '#FFD700', medal: '🥇' }, 
-        { badge: '2nd Place', color: '#C0C0C0', medal: '🥈' }, 
-        { badge: '3rd Place', color: '#CD7F32', medal: '🥉' } 
-    ];
-
-    groupArray.forEach((grp, index) => {
-        let rank = rankDetails[index];
-        let badgeElem = document.getElementById('badge' + grp.id);
-        if(badgeElem) { 
-            badgeElem.innerHTML = `${rank.medal} ${rank.badge}`; 
-            badgeElem.style.color = rank.color; 
-            badgeElem.style.borderColor = rank.color; 
+function getTop3WithTies(entries){
+    const sorted = entries.slice().sort((a,b)=>(b.mark||0)-(a.mark||0));
+    let top = [];
+    let lastMark = null;
+    let rank = 0;
+    for(let i=0;i<sorted.length;i++){
+        if(sorted[i].mark < 0) continue;
+        if(lastMark===null || sorted[i].mark!== lastMark){
+            rank++;
+            lastMark = sorted[i].mark;
         }
-    });
+        if(rank <= 3) top.push({...sorted[i], _rank: rank});
+        else break;
+    }
+    return top;
 }
 
-        // --- 2. ഷെഡ്യൂൾ ലോഡ് ചെയ്യുക ---
         async function loadSchedule() {
             let list = document.getElementById("scheduleList");
             if(!list) return;
@@ -331,99 +263,191 @@ async function updateScores() {
                 </div>`;
             });
         }
+        async function updateScores() {
+    let scores = {
+        "Andalusian Legends": 0,
+        "Ottoman Titans": 0,
+        "Baghdad Warriors": 0
+    };
+    try {
+        const { data: participants } = await window.dbClient.from('participants').select('chest_no, name, team_name, program_id');
+        const partMap = {};
+        (participants || []).forEach(p => {
+            if(p.chest_no && p.program_id) {
+                partMap[String(p.chest_no).trim() + "_" + String(p.program_id).trim()] = p.team_name;
+            }
+            if(p.chest_no) {
+                partMap[String(p.chest_no).trim()] = p.team_name;
+            }
+        });
 
-// --- 3. റിസൾട്ടുകൾ ലോഡ് ചെയ്യുക (അഡ്മിൻ/പ്രൈസ് പാനലുകളിലെ ലോജിക് പോലെ) ---
+        const { data: marksList, error: mError } = await window.dbClient.from('marks').select('*').eq('is_published', true);
+        if (mError) { console.error("Marks Error:", mError); return; }
+
+        // ✅ പ്രോഗ്രാമിന്റെ പേരും കാറ്റഗറിയും (അല്ലെങ്കിൽ ID) വെച്ച് കൃത്യമായി ഗ്രൂപ്പ് ചെയ്യുന്നു
+        const grouped = {};
+        (marksList || []).forEach(m => {
+            // പ്രോഗ്രാം നെയിമും കാറ്റഗറിയും ചേർത്തൊരു യുണീക്ക് കീ ഉണ്ടാക്കുന്നു (Junior, Senior മാറാതിരിക്കാൻ)
+            let progKey = (m.program_name || '') + "_" + (m.category || m.program_id || '');
+            if (!grouped[progKey]) grouped[progKey] = [];
+            grouped[progKey].push(m);
+        });
+
+        Object.keys(grouped).forEach(progKey => {
+            let entries = grouped[progKey].slice().sort((a, b) => (b.mark || 0) - (a.mark || 0));
+            
+            let topEntries = [];
+            let lastMark = null;
+            let rank = 0;
+
+            for (let i = 0; i < entries.length; i++) {
+                if (entries[i].mark < 0) continue;
+                if (lastMark === null || entries[i].mark !== lastMark) {
+                    rank++;
+                    lastMark = entries[i].mark;
+                }
+                if (rank <= 3) {
+                    topEntries.push({ ...entries[i], _rank: rank });
+                } else {
+                    break;
+                }
+            }
+
+            topEntries.forEach(entry => {
+                let team = '';
+                let chestStr = String(entry.chest_no || '').trim();
+                let progStr = String(entry.program_id || entry.program_name || '').trim();
+
+                if (entry.judge_name && entry.judge_name.startsWith('Manual Entry:')) {
+                    let parts = entry.judge_name.replace('Manual Entry:', '').trim().split('(');
+                    if (parts[1]) team = parts[1].replace(')', '').trim();
+                }
+
+                if (!team) {
+                    team = partMap[chestStr + "_" + progStr] || partMap[chestStr] || entry.team_name || '';
+                }
+
+                if (team && scores.hasOwnProperty(team)) {
+                    scores[team] += Number(entry.mark) || 0;
+                }
+            });
+        });
+
+        console.log("Updated Final Scores:", scores);
+
+        // UI Update
+        let elAnd = document.getElementById('scoreAndalusian');
+        if(elAnd) elAnd.innerText = scores["Andalusian Legends"];
+
+        let elOtt = document.getElementById('scoreOttoman');
+        if(elOtt) elOtt.innerText = scores["Ottoman Titans"];
+
+        let elBag = document.getElementById('scoreBaghdad');
+        if(elBag) elBag.innerText = scores["Baghdad Warriors"];
+
+    } catch(e) { 
+        console.error("Error in updateScores:", e); 
+    }
+}
+
 async function loadResults() {
     let list = document.getElementById("resultsList");
     if(!list) return;
     list.innerHTML = "<div style='text-align:center; color:#888; padding:20px;'>Loading...</div>";
 
     try {
-        const { data: marksList, error } = await db
-    .from('marks')
-    .select('*')
-    .eq('is_published', true)          // ✅ ഇത് കൂടി ചേർക്കുക
-    .ilike('status', '%Published%');   // ✅ 'Announced' എന്നത് 'Published' ആക്കി മാറ്റുക
+        const { data: marksList, error } = await window.dbClient.from('marks')
+            .select('*')
+            .eq('is_published', true);
 
         if (error) { console.error(error); return; }
 
         list.innerHTML = "";
-        
+
         if (!marksList || marksList.length === 0) {
             list.innerHTML = "<div style='text-align:center; color:#888; padding:20px;'>No results published yet.</div>";
             return;
         }
 
-        // പ്രോഗ്രാം കാറ്റഗറികൾ എടുക്കുന്നു
-        const { data: programsData } = await db.from('programs').select('name, category');
+        const { data: programsData } = await window.dbClient.from('programs').select('name, category');
         const catMap = {};
         (programsData || []).forEach(p => { catMap[p.name] = p.category; });
 
-        // പങ്കെടുക്കുന്നവരുടെ ഡാറ്റ എടുക്കുന്നു
-        const { data: participants } = await db.from('participants').select('*');
+        const { data: participants } = await window.dbClient.from('participants').select('chest_no, name, team_name, program_id');
         const partMap = {};
-        (participants || []).forEach(p => {
-            partMap[String(p.chest_no).trim()] = p;
-        });
+        (participants || []).forEach(p => { partMap[String(p.chest_no).trim() + "_" + p.program_id] = p; });
 
-        // പ്രോഗ്രാം അനുസരിച്ച് ഗ്രൂപ്പ് ചെയ്യുക
+        // ✅ ഇത് മുതൽ പുതിയ ലോജിക്: program_name + category കൊണ്ട് ഗ്രൂപ്പ് ചെയ്യുന്നു
         const grouped = {};
         marksList.forEach(m => {
-            if (!grouped[m.program_name]) grouped[m.program_name] = [];
-            grouped[m.program_name].push(m);
+            const cat = m.category || catMap[m.program_name] || 'General';
+            const key = m.program_name + "|" + cat;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(m);
         });
 
-        // റിസൾട്ട് HTML ഉണ്ടാക്കുന്നു
-        Object.keys(grouped).forEach(progName => {
-            const entries = grouped[progName].slice().sort((a, b) => (b.mark || 0) - (a.mark || 0));
-            const top3 = entries.slice(0, 3);
-            const category = catMap[progName] || entries[0]?.category || 'General';
-            
+        // ✅ ഇത് മുതൽ പുതിയ ലോജിക്: ഒരേ മാർക്ക് ഉള്ളവർക്ക് ഒരേ റാങ്ക്, 1st/2nd/3rd റാങ്കുകളിൽ ഉള്ള എല്ലാവരെയും കാണിക്കും
+        Object.keys(grouped).forEach(fullKey => {
+            const [progName, category] = fullKey.split('|');
+            const entries = grouped[fullKey].slice().sort((a, b) => (b.mark || 0) - (a.mark || 0));
+
+            let topEntries = [];
+            let lastMark = null;
+            let rank = 0;
+
+            for (let i = 0; i < entries.length; i++) {
+                if (entries[i].mark < 0) continue;
+                if (lastMark === null || entries[i].mark !== lastMark) {
+                    rank++;
+                    lastMark = entries[i].mark;
+                }
+                if (rank <= 3) {
+                    topEntries.push({ ...entries[i], _rank: rank });
+                } else {
+                    break;
+                }
+            }
+
             const medals = ['🥇', '🥈', '🥉'];
+            let winnersHtml = '';
 
-            // ✅ വിജയികളുടെ വിവരങ്ങൾ ഫോർമാറ്റ് ചെയ്യുക (Manual Entry ഉൾപ്പെടെ)
-            const parseWinner = (entry, medal) => {
-                if (!entry) return `${medal} <span style="color:#888;">-</span>`;
-                
-                const chest = String(entry.chest_no || '').trim();
-                let name = '';
-                let group = '-';
+            topEntries.forEach((entry) => {
+                let studentName = '';
+                let groupName = '';
 
-                // 🔥 1. ആദ്യം participants ടേബിളിൽ chest_no വഴി കണ്ടെത്തുക
-                const pInfo = partMap[chest];
-                if (pInfo) {
-                    name = pInfo.name || ('Chest ' + chest);
-                    group = pInfo.team_name || pInfo.group_name || '-';
-                } 
-                // 🔥 2. Manual Entry ആണെങ്കിൽ judge_name പാർസ് ചെയ്യുക
-                else if (entry.judge_name && entry.judge_name.startsWith('Manual Entry:')) {
+                if (entry.judge_name && entry.judge_name.startsWith('Manual Entry:')) {
                     let parts = entry.judge_name.replace('Manual Entry:', '').trim().split('(');
-                    name = parts[0].trim();
-                    if (parts[1]) {
-                        group = parts[1].replace(')', '').trim();
-                    }
-                } 
-                // 🔥 3. അവസാനം പേര് കിട്ടിയില്ലെങ്കിൽ Chest എന്ന് മാത്രം കാണിക്കുക
-                else {
-                    name = entry.student_name || ('Chest ' + chest);
-                    group = entry.group_name || '-';
+                    studentName = parts[0].trim();
+                    if (parts[1]) groupName = parts[1].replace(')', '').trim();
                 }
 
-                const chestDisplay = chest ? `(Chest: ${chest})` : '';
-                return `${medal} <b>${name}</b> ${chestDisplay} <span class="group-tag">(${group})</span>`;
-            };
+                if (!studentName || studentName.startsWith('Chest ')) {
+                    let pInfo = partMap[String(entry.chest_no).trim() + "_" + progName];
+                    if (pInfo) {
+                        studentName = pInfo.name || ('Chest ' + entry.chest_no);
+                        groupName = pInfo.team_name || '';
+                    } else {
+                        studentName = entry.student_name || ('Chest ' + entry.chest_no);
+                    }
+                }
 
-            const w1 = parseWinner(top3[0], medals[0]);
-            const w2 = parseWinner(top3[1], medals[1]);
-            const w3 = parseWinner(top3[2], medals[2]);
+                let chestDisplay = entry.chest_no ? '(Chest: ' + entry.chest_no + ')' : '';
+                let gradeVal = entry.grade || '-';
+                let scoreVal = entry.mark || '0';
+
+                let medal = '';
+                if (entry._rank === 1) medal = medals[0];
+                else if (entry._rank === 2) medal = medals[1];
+                else if (entry._rank === 3) medal = medals[2];
+
+                winnersHtml += `<div class="winner-row">${medal} <b>${studentName}</b> ${chestDisplay} <span class="group-tag">(${groupName})</span></div>`;
+            });
 
             list.innerHTML += `
                 <div class="item-card">
                     <div class="category-badge">${category}</div>
                     <h4 style="color:#ffffff; margin-bottom:8px; font-size:16px;">${progName}</h4>
-                    <div class="winner-row">${w1}</div>
-                    <div class="winner-row">${w2}</div>
-                    <div class="winner-row">${w3}</div>
+                    <div class="winner-row">${winnersHtml}</div>
                 </div>
             `;
         });
@@ -432,8 +456,6 @@ async function loadResults() {
         list.innerHTML = "<div style='text-align:center; color:#888; padding:20px;'>Error loading results.</div>";
     }
 }
-
-// --- 4. ഗാലറി ലോഡ് ചെയ്യുക (Supabase Database-ൽ നിന്ന്) ---
 async function loadPublicGallery() {
     let list = document.getElementById("publicGalleryList");
     if(!list) return;

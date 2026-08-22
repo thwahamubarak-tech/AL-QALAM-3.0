@@ -44,19 +44,21 @@
                 codedSet.add(String(c.chest_no).trim() + "_" + c.program_name);
             });
 
-            // ഇനിയും code letter കിട്ടാത്തവരെ മാത്രം എടുക്കുന്നു
+            // 🔥 പ്രധാന മാറ്റം: participants ലിസ്റ്റിൽ category ഉം കൂടി ഉൾപ്പെടുത്തുന്നു
             let pending = (participants || []).filter(p => {
+                // ഇതിനകം code കിട്ടിയവരെ ഒഴിവാക്കുന്നു
                 return !codedSet.has(String(p.chest_no).trim() + "_" + p.program_id);
             });
 
-            // സെർച്ച് ഫിൽട്ടർ
+            // സെർച്ച് ഫിൽട്ടർ (category ഉം കൂടി)
             if (searchTerm) {
                 pending = pending.filter(p => {
                     let cat = catMap[p.program_id] || '';
                     return (p.name || '').toLowerCase().includes(searchTerm) ||
                            (p.program_id || '').toLowerCase().includes(searchTerm) ||
                            cat.toLowerCase().includes(searchTerm) ||
-                           (p.team_name || '').toLowerCase().includes(searchTerm);
+                           (p.team_name || '').toLowerCase().includes(searchTerm) ||
+                           (p.category || '').toLowerCase().includes(searchTerm); // ✅ category സെർച്ച്
                 });
             }
 
@@ -67,12 +69,17 @@
                 return;
             }
 
-            // പ്രോഗ്രാം അനുസരിച്ച് ഗ്രൂപ്പ് ചെയ്യുന്നു
+            // 🔥 പ്രോഗ്രാം ഗ്രൂപ്പ് ചെയ്യുമ്പോൾ category ഉം ചേർത്ത് ഗ്രൂപ്പ് ചെയ്യുന്നു
             let groupedMap = {};
             pending.forEach(p => {
-                let key = p.program_id;
+                // പ്രോഗ്രാം പേര് + കാറ്റഗറി ചേർത്ത് ഒരു കീ ഉണ്ടാക്കുന്നു
+                let key = p.program_id + "|" + (p.category || catMap[p.program_id] || 'General');
                 if (!groupedMap[key]) {
-                    groupedMap[key] = { prog: p.program_id, cat: catMap[p.program_id] || '', items: [] };
+                    groupedMap[key] = { 
+                        prog: p.program_id, 
+                        cat: p.category || catMap[p.program_id] || 'General', 
+                        items: [] 
+                    };
                 }
                 groupedMap[key].items.push(p);
             });
