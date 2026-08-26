@@ -71,43 +71,128 @@ box-sizing: border-box;
         .main-fest-title { color: #D4AF37; font-size: 26px; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px; }
         .school-subtitle { font-size: 12px; color: #eee; opacity: 0.9; }
 
-        /* Group Cards */
-        .group-card {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 18px 22px 22px;
-            margin-bottom: 18px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            width: 100%;
-box-sizing: border-box;
-        }
-        
-        .rank-badge {
-            font-size: 12px;
-            font-weight: bold;
-            padding: 3px 12px;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            margin-bottom: 10px;
-            display: inline-block;
-            letter-spacing: 0.5px;
-        }
+        /* ================================
+   PROFESSIONAL GROUP SCORE CARDS
+   ================================ */
 
-        .medal-img { height: 38px; width: auto; margin-bottom: 8px; }
-        .group-name { font-size: 20px; font-weight: bold; color: #fff; margin-bottom: 4px; }
-        .group-score { font-size: 34px; font-weight: bold; color: #D4AF37; margin: 5px 0; }
-        .points-label { font-size: 12px; color: #999; text-transform: capitalize; }
-        
-        .standing-footer { text-align: center; color: #666; font-size: 11px; margin: 20px 0; }
+.group-card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 14px;
+    padding: 22px 18px 24px;
+    margin-bottom: 18px;
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
 
+/* Andalusian Legends */
+#cardAndalusian {
+    border-left: 5px solid #0284c7;
+}
+
+#cardAndalusian .group-name {
+    color: #0284c7;
+}
+
+#cardAndalusian .group-score {
+    color: #0284c7;
+}
+
+#cardAndalusian .rank-badge {
+    border-color: rgba(2,132,199,0.45);
+}
+
+/* Ottoman Titans */
+#cardOttoman {
+    border-left: 5px solid #E91E63;
+}
+
+#cardOttoman .group-name {
+    color: #E91E63;
+}
+
+#cardOttoman .group-score {
+    color: #E91E63;
+}
+
+#cardOttoman .rank-badge {
+    border-color: rgba(233,30,99,0.45);
+}
+
+/* Baghdad Warriors */
+#cardBaghdad {
+    border-left: 5px solid #facc15;
+}
+
+#cardBaghdad .group-name {
+    color: #facc15;
+}
+
+#cardBaghdad .group-score {
+    color: #facc15;
+}
+
+#cardBaghdad .rank-badge {
+    border-color: rgba(250,204,21,0.45);
+}
+
+/* Rank Badge */
+.rank-badge {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 13px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.06);
+    margin-bottom: 10px;
+    display: inline-block;
+    letter-spacing: 0.5px;
+}
+
+/* Medal */
+.medal-img {
+    height: 38px;
+    width: auto;
+    margin-bottom: 8px;
+}
+
+/* Group Name */
+.group-name {
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    transition: color 0.2s ease;
+}
+
+/* Score */
+.group-score {
+    font-size: 36px;
+    font-weight: 800;
+    margin: 5px 0;
+    transition: color 0.2s ease;
+}
+
+/* Points */
+.points-label {
+    font-size: 12px;
+    color: #999;
+    text-transform: capitalize;
+}
+
+/* Footer */
+.standing-footer {
+    text-align: center;
+    color: #666;
+    font-size: 11px;
+    margin: 20px 0;
+}
         /* Other Views & Result Cards */
         .view-section { display: none; }
         .view-section.active { display: block; }
@@ -335,15 +420,46 @@ function getTop3WithTies(entries){
 
         console.log("Updated Final Scores:", scores);
 
-        // UI Update
-        let elAnd = document.getElementById('scoreAndalusian');
-        if(elAnd) elAnd.innerText = scores["Andalusian Legends"];
+        // UI Update + Automatic Ranking Order
 
-        let elOtt = document.getElementById('scoreOttoman');
-        if(elOtt) elOtt.innerText = scores["Ottoman Titans"];
+let groups = [
+    {
+        id: "cardAndalusian",
+        name: "Andalusian Legends",
+        score: scores["Andalusian Legends"]
+    },
+    {
+        id: "cardOttoman",
+        name: "Ottoman Titans",
+        score: scores["Ottoman Titans"]
+    },
+    {
+        id: "cardBaghdad",
+        name: "Baghdad Warriors",
+        score: scores["Baghdad Warriors"]
+    }
+];
 
-        let elBag = document.getElementById('scoreBaghdad');
-        if(elBag) elBag.innerText = scores["Baghdad Warriors"];
+// കൂടുതൽ മാർക്ക് → മുകളിലേക്ക്
+groups.sort((a, b) => b.score - a.score);
+
+// Cards വീണ്ടും ക്രമീകരിക്കുക
+const container = document.getElementById("scoreContainer");
+
+groups.forEach(group => {
+    const card = document.getElementById(group.id);
+
+    if (card) {
+        // Score update
+        const scoreElement = card.querySelector(".group-score");
+        if (scoreElement) {
+            scoreElement.innerText = group.score;
+        }
+
+        // Card order മാറ്റുക
+        container.appendChild(card);
+    }
+});
 
     } catch(e) { 
         console.error("Error in updateScores:", e); 
@@ -484,9 +600,49 @@ async function loadPublicGallery() {
 }
 
         document.addEventListener("DOMContentLoaded", () => {
-            updateScores();
-            setInterval(updateScores, 3000);
+
+    // ആദ്യം ഒരിക്കൽ scores load ചെയ്യുക
+    updateScores();
+
+    // Supabase Realtime
+    const realtimeChannel = db
+        .channel('public-live-score-updates')
+
+        // Marks മാറുമ്പോൾ
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'marks'
+            },
+            (payload) => {
+                console.log("Marks changed:", payload);
+
+                // Database update വന്ന ഉടൻ scores വീണ്ടും കണക്കാക്കുക
+                updateScores();
+            }
+        )
+
+        // Participants മാറുമ്പോഴും
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'participants'
+            },
+            (payload) => {
+                console.log("Participants changed:", payload);
+
+                updateScores();
+            }
+        )
+
+        .subscribe((status) => {
+            console.log("Realtime status:", status);
         });
+});
     </script>
 </body>
 </html>

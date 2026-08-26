@@ -1654,5 +1654,306 @@ async function publishResultFromAnnounce(programName, category) {
 }
     setInterval(() => { renderAnnounceDesk(); renderJudgeResults(); renderResults(); renderScores(); }, 2000);
     </script>
+    <script>
+/* =========================================================
+   AL QALAM 3.0
+   FINAL ADMIN REALTIME SYSTEM
+   ========================================================= */
+
+(function () {
+
+    let realtimeRefreshTimer = null;
+
+    /* -----------------------------------------------------
+       എല്ലാ Admin sections refresh ചെയ്യുക
+       ----------------------------------------------------- */
+    function refreshAllAdminSections() {
+
+        clearTimeout(realtimeRefreshTimer);
+
+        realtimeRefreshTimer = setTimeout(async function () {
+
+            console.log("🔴 ADMIN REALTIME UPDATE RECEIVED");
+
+            /* Programs */
+            if (typeof renderPrograms === "function") {
+                renderPrograms();
+            }
+
+            /* Schedule */
+            if (typeof renderSchedule === "function") {
+                renderSchedule();
+            }
+
+            /* Results */
+            if (typeof renderResults === "function") {
+                renderResults();
+            }
+
+            /* Scores + Individual Leaderboard */
+            if (typeof renderScores === "function") {
+                renderScores();
+            }
+
+            /* Code Desk */
+            if (typeof renderCodeAllocations === "function") {
+                renderCodeAllocations();
+            }
+
+            /* Master Program View */
+            if (typeof renderMasterCategoryView === "function") {
+
+                let category =
+                    (typeof currentMasterCat !== "undefined")
+                        ? currentMasterCat
+                        : "Junior";
+
+                renderMasterCategoryView(category);
+            }
+
+            /* Gallery */
+            if (typeof renderGalleryManager === "function") {
+                renderGalleryManager();
+            }
+            else if (typeof renderAdminPhotos === "function") {
+                renderAdminPhotos();
+            }
+
+            /* Leader Entries */
+            if (typeof renderLeaderEntries === "function") {
+
+                let group =
+                    (typeof currentLeaderGroup !== "undefined")
+                        ? currentLeaderGroup
+                        : "Andalusian Legends";
+
+                renderLeaderEntries(group);
+            }
+
+            /* Judges / Leads */
+            if (typeof renderJudgeResults === "function") {
+                renderJudgeResults();
+            }
+
+            /* Announce + Prize */
+            if (typeof renderAnnounceDesk === "function") {
+                renderAnnounceDesk();
+            }
+
+            console.log("✅ ALL ADMIN SECTIONS REFRESHED");
+
+        }, 300);
+    }
+
+
+    /* =====================================================
+       SUPABASE REALTIME CHANNEL
+       ===================================================== */
+
+    const realtimeChannel = window.dbClient
+        .channel("al-qalam-admin-final-realtime")
+
+
+        /* -------------------------------------------------
+           PARTICIPANTS
+
+           Leader Entries
+           Master Program
+           Code Desk
+           Results
+           Scores
+           ------------------------------------------------- */
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "participants"
+            },
+            function () {
+
+                console.log("👥 Participants changed");
+
+                refreshAllAdminSections();
+            }
+        )
+
+
+        /* -------------------------------------------------
+           PROGRAMS
+
+           Programs
+           Schedule dropdown
+           Master Program
+           Results
+           Scores
+           ------------------------------------------------- */
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "programs"
+            },
+            function () {
+
+                console.log("📚 Programs changed");
+
+                refreshAllAdminSections();
+            }
+        )
+
+
+        /* -------------------------------------------------
+           SCHEDULE
+           ------------------------------------------------- */
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "schedule"
+            },
+            function () {
+
+                console.log("📅 Schedule changed");
+
+                refreshAllAdminSections();
+            }
+        )
+
+
+        /* -------------------------------------------------
+           MARKS
+
+           Judge → Admin
+           Admin → Announce
+           Announce → Admin
+           Admin → Prize
+           Prize → Admin
+           Published Results
+           Scores
+           ------------------------------------------------- */
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "marks"
+            },
+            function () {
+
+                console.log("🏆 Marks / Results changed");
+
+                refreshAllAdminSections();
+            }
+        )
+
+
+        /* -------------------------------------------------
+           CODE LETTERS
+
+           Code Desk → Admin
+           Code Desk → Judge
+           ------------------------------------------------- */
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "code_letters"
+            },
+            function () {
+
+                console.log("🔐 Code Letters changed");
+
+                refreshAllAdminSections();
+            }
+        )
+
+
+        /* -------------------------------------------------
+           GALLERY
+
+           Gallery upload/delete → Admin
+           ------------------------------------------------- */
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "gallery"
+            },
+            function () {
+
+                console.log("🖼 Gallery changed");
+
+                refreshAllAdminSections();
+            }
+        )
+
+
+        /* -------------------------------------------------
+           CONNECT
+           ------------------------------------------------- */
+        .subscribe(function (status) {
+
+            console.log(
+                "ADMIN REALTIME STATUS:",
+                status
+            );
+
+            if (status === "SUBSCRIBED") {
+
+                console.log(
+                    "✅ AL QALAM 3.0 ADMIN REALTIME CONNECTED"
+                );
+
+            }
+
+            if (status === "CHANNEL_ERROR") {
+
+                console.error(
+                    "❌ ADMIN REALTIME CHANNEL ERROR"
+                );
+
+            }
+
+            if (status === "TIMED_OUT") {
+
+                console.error(
+                    "⏱ ADMIN REALTIME CONNECTION TIMED OUT"
+                );
+
+            }
+
+        });
+
+
+    /* -----------------------------------------------------
+       Page open ആയ ഉടൻ എല്ലാ sections load ചെയ്യുക
+       ----------------------------------------------------- */
+
+    setTimeout(function () {
+
+        console.log(
+            "🚀 Initial Admin Realtime Refresh"
+        );
+
+        refreshAllAdminSections();
+
+    }, 500);
+
+
+    /* -----------------------------------------------------
+       Channel globally available
+       ----------------------------------------------------- */
+
+    window.alQalamAdminRealtimeChannel =
+        realtimeChannel;
+
+
+})();
+</script>
 </body>
 </html>

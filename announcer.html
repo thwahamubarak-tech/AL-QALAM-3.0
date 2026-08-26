@@ -35,7 +35,35 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        document.addEventListener("DOMContentLoaded", renderAnnouncerDesk);
+        document.addEventListener("DOMContentLoaded", () => {
+    renderAnnouncerDesk();
+
+    db.channel('announcer-realtime')
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'marks'
+      }, () => {
+          renderAnnouncerDesk();
+      })
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'participants'
+      }, () => {
+          renderAnnouncerDesk();
+      })
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'programs'
+      }, () => {
+          renderAnnouncerDesk();
+      })
+      .subscribe((status) => {
+          console.log("Announcer Realtime:", status);
+      });
+});
 
         async function renderAnnouncerDesk() {
     const { data: marksList, error: marksErr } = await db.from('marks').select('*').eq('status', 'Approved');

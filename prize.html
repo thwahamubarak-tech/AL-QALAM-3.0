@@ -35,7 +35,35 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        document.addEventListener("DOMContentLoaded", renderPrizeDesk);
+        document.addEventListener("DOMContentLoaded", () => {
+    renderPrizeDesk();
+
+    db.channel('prize-realtime')
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'marks'
+      }, () => {
+          renderPrizeDesk();
+      })
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'participants'
+      }, () => {
+          renderPrizeDesk();
+      })
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'programs'
+      }, () => {
+          renderPrizeDesk();
+      })
+      .subscribe((status) => {
+          console.log("Prize Realtime:", status);
+      });
+});
 
         async function renderPrizeDesk() {
     const { data: marksList, error } = await db.from('marks')

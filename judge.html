@@ -27,7 +27,26 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_lj6bDDH7Os701RZEaXi8Ow_Awp-Gucs';
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        document.addEventListener("DOMContentLoaded", renderJudgeDesk);
+        document.addEventListener("DOMContentLoaded", () => {
+    renderJudgeDesk();
+
+    db.channel('judge-realtime')
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'code_letters'
+      }, () => {
+          renderJudgeDesk();
+      })
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'marks'
+      }, () => {
+          renderJudgeDesk();
+      })
+      .subscribe();
+});
 
         // --- 1. ജഡ്ജ് ഡെസ്ക് റെൻഡർ ചെയ്യുക ---
         async function renderJudgeDesk() {
