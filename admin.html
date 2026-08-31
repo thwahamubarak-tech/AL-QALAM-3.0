@@ -388,6 +388,89 @@
                 toggleNav();
             }
         }
+        var searchDebounce = null;
+function doSearch() {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(runSearch, 250);
+}
+
+async function runSearch() {
+    var query = document.getElementById('globalSearch').value.trim().toLowerCase();
+    var resultsBox = document.getElementById('searchResults');
+    if (query.length < 2) {
+        resultsBox.style.display = 'none';
+        resultsBox.innerHTML = '';
+        return;
+    }
+    resultsBox.innerHTML = '<div style="color:#D4AF37;">Searching...</div>';
+    resultsBox.style.display = 'block';
+
+    const { data: programs } = await window.dbClient.from('programs').select('*');
+    const { data: participants } = await window.dbClient.from('participants').select('*');
+
+    var progMatches = (programs || []).filter(function (p) {
+        return (p.name || '').toLowerCase().includes(query) || (p.category || '').toLowerCase().includes(query);
+    });
+    var studMatches = (participants || []).filter(function (s) {
+        return (s.name || '').toLowerCase().includes(query) ||
+               String(s.chest_no || '').toLowerCase().includes(query) ||
+               (s.team_name || '').toLowerCase().includes(query);
+    });
+
+    if (progMatches.length === 0 && studMatches.length === 0) {
+        resultsBox.innerHTML = '<div style="color:#999;">No matches found for "' + query.replace(/</g, '&lt;') + '"</div>';
+        return;
+    }
+
+    var out = '';
+
+    if (progMatches.length > 0) {
+        out += '<div style="color:#D4AF37; font-weight:bold; margin-bottom:6px;">📋 Programs (' + progMatches.length + ')</div>';
+        progMatches.slice(0, 10).forEach(function (p) {
+            var regs = (participants || []).filter(function (s) {
+                return (s.program_id || '') === p.name;
+            });
+            out += '<div style="padding:8px; border-bottom:1px solid #333;"><strong style="color:#fff;">' + p.name + '</strong><span style="color:#aaa; font-size:12px;"> — ' + p.category + '</span>';
+            if (regs.length > 0) {
+                out += '<div style="margin-top:4px; padding-left:10px; border-left:2px solid #D4AF37;">';
+                regs.forEach(function (r) {
+                    out += '<div style="color:#ccc; font-size:12px; padding:2px 0;">👤 ' + r.name + ' (Chest #' + r.chest_no + (r.team_name ? ', ' + r.team_name : '') + ')</div>';
+                });
+                out += '</div>';
+            } else {
+                out += '<div style="color:#777; font-size:12px; margin-top:4px;">No participants registered</div>';
+            }
+            out += '</div>';
+        });
+    }
+
+    if (studMatches.length > 0) {
+        var grouped = {};
+        studMatches.forEach(function (s) {
+            var key = String(s.chest_no) + '_' + s.name;
+            if (!grouped[key]) grouped[key] = { name: s.name, chest_no: s.chest_no, team_name: s.team_name, programs: [] };
+            grouped[key].programs.push(s.program_id || 'Unknown Program');
+        });
+        out += '<div style="color:#D4AF37; font-weight:bold; margin:10px 0 6px;">👤 Participants (' + Object.keys(grouped).length + ')</div>';
+        Object.values(grouped).slice(0, 15).forEach(function (g) {
+            out += '<div style="padding:8px; border-bottom:1px solid #333;"><strong style="color:#fff;">' + g.name + '</strong><span style="color:#aaa; font-size:12px;"> — Chest #' + g.chest_no + (g.team_name ? ' | ' + g.team_name : '') + '</span>';
+            out += '<div style="margin-top:4px; padding-left:10px; border-left:2px solid #D4AF37;">';
+            g.programs.forEach(function (pn) {
+                out += '<div style="color:#ccc; font-size:12px; padding:2px 0;">🎭 ' + pn + '</div>';
+            });
+            out += '</div></div>';
+        });
+    }
+
+    resultsBox.innerHTML = out;
+    resultsBox.style.display = 'block';
+}
+
+function jumpToCategory(catName) {
+    if (!catName) return;
+    switchTab('masterProgView');
+    switchMasterCategory(catName);
+}
         async function renderPrograms() {
             const { data: progs } = await window.dbClient.from('programs').select('*');
             var html = '';
