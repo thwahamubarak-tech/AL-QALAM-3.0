@@ -1673,16 +1673,6 @@ async function publishResultFromAnnounce(programName, category) {
 }
     async function sendToPrizeFromAdmin(programName, category) {
     try {
-        // 🔥 ആദ്യം ഈ പ്രോഗ്രാം Group ആണോ എന്ന് പരിശോധിക്കുന്നു
-        const { data: progData } = await window.dbClient.from('programs')
-            .select('type')
-            .eq('name', programName)
-            .single();
-
-        if (progData && progData.type === 'Group') {
-            alert("Group Programs are not eligible for Prize!");
-            return;
-        }
 
         // ✅ ഇനി program_name + category കൊണ്ട് ഫിൽട്ടർ ചെയ്യുന്നു
         const { data: records, error: fetchError } = await window.dbClient
