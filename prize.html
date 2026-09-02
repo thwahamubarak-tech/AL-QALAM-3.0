@@ -199,10 +199,13 @@ else if (entry._rank === 2) medal = medals[1];
                 return;
             }
 
-            const { data: records, error: fetchErr } = await db.from('marks')
-                .select('id')
-                .eq('program_name', programName)
-                .eq('category', category); // ✅ ഇത് കൂടി ചേർക്കുക!
+                        let query = db.from('marks').select('id').eq('program_name', programName);
+            if (category === 'General') {
+                query = query.or(`category.eq.General,category.is.null`);
+            } else {
+                query = query.eq('category', category);
+            }
+            const { data: records, error: fetchErr } = await query;
 
             if (fetchErr || !records) {
                 alert('Error processing prize update.');
