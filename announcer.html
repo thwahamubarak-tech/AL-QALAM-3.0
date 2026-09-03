@@ -180,12 +180,12 @@
 }
 
         async function markAsAnnounced(programName, category) {
-                const { data: records, error: fetchErr } = 
+            const { data: records, error: fetchErr } = 
         await db.from('marks')
         .select('id')
         .eq('program_name', programName)
         .eq('status', 'Approved')
-        .eq('category', category); // ഒരു ഡോട്ട് മാത്രം മതി
+        .eq('category', category);
             if (fetchErr) {
                 alert('Error: ' + fetchErr.message);
                 return;
