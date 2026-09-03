@@ -444,30 +444,30 @@ let groups = [
 groups.sort((a, b) => b.score - a.score);
 
 // Cards വീണ്ടും ക്രമീകരിക്കുക
-// Cards വീണ്ടും ക്രമീകരിക്കുക
 const container = document.getElementById("scoreContainer");
 
 groups.forEach((group, index) => {
     const card = document.getElementById(group.id);
 
     if (card) {
-        // 📌 ഗ്രൂപ്പ് സ്കോറുകൾ ഹോം പേജിൽ ഹൈഡ് ചെയ്യാൻ / ചോദ്യചിഹ്നം (?) കാണിക്കാൻ:
+        // Score update
         const scoreElement = card.querySelector(".group-score");
         if (scoreElement) {
-            scoreElement.innerText = "?"; // അല്ലെങ്കിൽ "0" എന്ന് കൊടുക്കാം
+            scoreElement.innerText = group.score;
         }
 
-        // 📌 റാങ്ക് ബാഡ്ജും സമാനമായി ഹൈഡ് ചെയ്യണമെങ്കിൽ:
+        // ✅ Rank Badge & Medal മാറാൻ ഇത് ചേർക്കുക
         const badgeElement = card.querySelector(".rank-badge");
         if (badgeElement) {
-            badgeElement.innerText = "🔒 Hidden"; 
+            if (index === 0) badgeElement.innerText = "🥇 1st Place";
+            else if (index === 1) badgeElement.innerText = "🥈 2nd Place";
+            else if (index === 2) badgeElement.innerText = "🥉 3rd Place";
         }
 
-        // Card order മാറ്റുക (ബാക്ക്ഗ്രൗണ്ടിൽ കാൽക്കുലേഷൻ കറക്റ്റ് ആയി നടക്കാൻ ഇത് അവിടെത്തന്നെ വെക്കുക)
+        // Card order മാറ്റുക
         container.appendChild(card);
     }
 });
-
 
 
     } catch(e) { 
