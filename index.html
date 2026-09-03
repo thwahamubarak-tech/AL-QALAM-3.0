@@ -613,27 +613,20 @@ async function loadPublicGallery() {
     // ആദ്യം ഒരിക്കൽ scores load ചെയ്യുക
     updateScores();
 
-    // Supabase Realtime
-    const realtimeChannel = db
-        .channel('public-live-score-updates')
-
-        // Marks മാറുമ്പോൾ
+    // ✅ Supabase Realtime (കൂടുതൽ കൃത്യമായി വർക്ക് ചെയ്യാൻ)
+    db.channel('schema-db-changes')
         .on(
             'postgres_changes',
             {
-                event: '*',
+                event: '*', // INSERT, UPDATE, DELETE എല്ലാം വാച്ച് ചെയ്യാൻ
                 schema: 'public',
                 table: 'marks'
             },
             (payload) => {
                 console.log("Marks changed:", payload);
-
-                // Database update വന്ന ഉടൻ scores വീണ്ടും കണക്കാക്കുക
-                updateScores();
+                updateScores(); // ഡാറ്റ മാറുമ്പോൾ ഓട്ടോമാറ്റിക് സ്കോർ അപ്ഡേറ്റ് ആകും
             }
         )
-
-        // Participants മാറുമ്പോഴും
         .on(
             'postgres_changes',
             {
@@ -643,15 +636,14 @@ async function loadPublicGallery() {
             },
             (payload) => {
                 console.log("Participants changed:", payload);
-
                 updateScores();
             }
         )
-
         .subscribe((status) => {
-            console.log("Realtime status:", status);
+            console.log("Realtime subscription status:", status);
         });
 });
+
     </script>
 </body>
 </html>

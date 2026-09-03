@@ -180,35 +180,49 @@
 }
 
         async function markAsAnnounced(programName, category) {
-            const { data: records, error: fetchErr } = 
+    // 1. ആദ്യം പ്രോഗ്രാം നെയിം വെച്ച് മാത്രം റെക്കോർഡുകൾ എടുകുക
+    let query = db.from('marks').select('id, program_name, judge_name').eq('program_name', programName).eq('status', 'Approved');
+    
+    const { data: records, error: fetchErr } = await query;
+
+    if (fetchErr) {
+        alert('Error: ' + fetchErr.message);
+        return;
+    }
+
+    if (!records || records.length === 0) {
+        alert('No records found for this program!');
+        return;
+    }
+
+    // 2. ഇത് മാനുവൽ എൻട്രി ആണോ എന്ന് നോക്കി അതിനനുസരിച്ച് മാച്ച് ചെയ്യുന്നു
+    let matchedRecords = records;
+    if (category && category !== 'General') {
+        matchedRecords = records.filter(rec => {
+            // മാനുവൽ എൻട്രി ആയതുകൊണ്ട് judge_name അല്ലെങ്കിൽ വേറെ എവിടെയെങ്കിലും കാറ്റഗറി ഉണ്ടോ എന്ന് നോക്കാം
+            // അല്ലെങ്കിൽ മാനുവൽ എൻട്രിക്ക് കാറ്റഗറി ഫിൽട്ടറിംഗ് ഒഴിവാക്കി നേരിട്ട് എടുക്കാം
+            let isManual = rec.judge_name && rec.judge_name.startsWith('Manual Entry:');
+            if (isManual) return true; // മാനുവൽ എൻട്രി ആണെങ്കിൽ കാറ്റഗറി ബ്ലോക്ക് ചെയ്യാതെ സെലക്ട് ചെയ്യും
+            
+            return true;
+        });
+    }
+
+    // 3. ഫൈനൽ ആയി അപ്ഡേറ്റ് ചെയ്യുന്നു
+    for (let rec of matchedRecords) {
         await db.from('marks')
-        .select('id')
-        .eq('program_name', programName)
-        .eq('status', 'Approved')
-        .eq('category', category);
-            if (fetchErr) {
-                alert('Error: ' + fetchErr.message);
-                return;
-            }
+            .update({ status: 'Announced' })
+            .eq('id', rec.id);
+    }
 
-            if (!records || records.length === 0) {
-                alert('No records found for this program!');
-                return;
-            }
+    alert('Marked as Announced Successfully!');
+    if (typeof renderAnnounceDesk === 'function') {
+        renderAnnounceDesk();
+    } else {
+        location.reload();
+    }
+}
 
-            for (let rec of records) {
-                await db.from('marks')
-                    .update({ status: 'Announced' })
-                    .eq('id', rec.id);
-            }
-
-            alert('Marked as Announced Successfully!');
-            if (typeof renderAnnounceDesk === 'function') {
-                renderAnnounceDesk();
-            } else {
-                location.reload();
-            }
-        }
                 async function returnToPending(programName, category) {
             if (!confirm(`തീർച്ചയായും "${programName}" റിസൾട്ട് തിരികെ അയக்கണോ?`)) return;
 
