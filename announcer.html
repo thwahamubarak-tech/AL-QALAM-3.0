@@ -195,18 +195,24 @@
         return;
     }
 
-    // 2. ഇത് മാനുവൽ എൻട്രി ആണോ എന്ന് നോക്കി അതിനനുസരിച്ച് മാച്ച് ചെയ്യുന്നു
-    let matchedRecords = records;
+        // 2. മാനുവൽ എൻട്രി ആണോ അതോ സാധാരണ എൻട്രി ആണോ എന്ന് നോക്കി ഫിൽട്ടർ ചെയ്യുന്നു
+    let matchedRecords = [];
+    
     if (category && category !== 'General') {
         matchedRecords = records.filter(rec => {
-            // മാനുവൽ എൻട്രി ആയതുകൊണ്ട് judge_name അല്ലെങ്കിൽ വേറെ എവിടെയെങ്കിലും കാറ്റഗറി ഉണ്ടോ എന്ന് നോക്കാം
-            // അല്ലെങ്കിൽ മാനുവൽ എൻട്രിക്ക് കാറ്റഗറി ഫിൽട്ടറിംഗ് ഒഴിവാക്കി നേരിട്ട് എടുക്കാം
+            let recCat = rec.category || 'General';
             let isManual = rec.judge_name && rec.judge_name.startsWith('Manual Entry:');
-            if (isManual) return true; // മാനുവൽ എൻട്രി ആണെങ്കിൽ കാറ്റഗറി ബ്ലോക്ക് ചെയ്യാതെ സെലക്ട് ചെയ്യും
             
-            return true;
+            // മാനുവൽ എൻട്രി ആണെങ്കിൽ കാറ്റഗറി ചെക്ക് ചെയ്യാതെ എടുക്കാം
+            if (isManual) return true;
+            
+            // സാധാരണ ജഡ്ജ് പാനൽ എൻട്രി ആണെങ്കിൽ കാറ്റഗറി മാച്ച് ചെയ്യണം
+            return String(recCat).trim().toLowerCase() === String(category).trim().toLowerCase();
         });
+    } else {
+        matchedRecords = records;
     }
+
 
     // 3. ഫൈനൽ ആയി അപ്ഡേറ്റ് ചെയ്യുന്നു
     for (let rec of matchedRecords) {
