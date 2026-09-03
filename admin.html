@@ -780,13 +780,22 @@ function escapeHTML(value) {
             studentName = 'Unknown (Chest: ' + m.chest_no + ')';
         }
 
-        var chestVal = m.chest_no || '';
-        var scoreVal = Number(m.mark) || 0;
-        var key = studentName + (chestVal ? "_" + chestVal : "");
-        if (!studentScores[key]) {
-            studentScores[key] = { name: studentName, chest: chestVal, totalScore: 0 };
-        }
-        studentScores[key].totalScore += scoreVal;
+        var chestVal = String(m.chest_no || '').trim();
+var scoreVal = Number(m.mark) || 0;
+
+// 🔥 ചെസ്സ് നമ്പർ മാത്രം കീ (Key) ആയി ഉപയോഗിക്കുന്നു (പേരിലെ വ്യത്യാസങ്ങൾ ഒഴിവാക്കാൻ)
+var key = chestVal; 
+
+if (!studentScores[key]) {
+    studentScores[key] = { name: studentName, chest: chestVal, totalScore: 0 };
+} else {
+    // നിലവിലുള്ള പേര് खाली ആണെങ്കിലോ അജ്ഞാതമാണെങ്കിലോ പുതിയ പേര് അപ്ഡേറ്റ് ചെയ്യാം
+    if (!studentScores[key].name || studentScores[key].name.startsWith('Unknown')) {
+        studentScores[key].name = studentName;
+    }
+}
+studentScores[key].totalScore += scoreVal;
+
     });
 
     var sortedStudents = Object.values(studentScores).sort(function(a, b) { return b.totalScore - a.totalScore; });
