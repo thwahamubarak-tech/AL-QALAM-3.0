@@ -729,14 +729,17 @@ function escapeHTML(value) {
     const { data: allProgs, error: pErr } = await window.dbClient.from('programs').select('*');
     if (pErr) { console.error(pErr); return; }
 
-    var partMap = {};
-    (participants || []).forEach(function(p) {
-        var cNo = String(p.chest_no || '').trim();
-        if (cNo) {
-            partMap[cNo + "_" + p.program_id] = p;
-            partMap[cNo] = p;
-        }
-    });
+            var partMap = {};
+        (participants || []).forEach(function(p) {
+            var cleanChest = String(p.chest_no || '').trim();
+            // ചെസ്സ് നമ്പർ മാത്രം അടിസ്ഥാനമാക്കി മാപ്പ് ചെയ്യുന്നു
+            if (cleanChest && !partMap[cleanChest]) {
+                partMap[cleanChest] = {
+                    name: p.name,
+                    team_name: p.team_name
+                };
+            }
+        });
 
     let allStudents = [];
     try {
@@ -760,9 +763,10 @@ function escapeHTML(value) {
         }
 
         var chestStr = String(m.chest_no || '').trim();
-        if (!studentName) {
-            var pInfo = partMap[chestStr + "_" + m.program_name] || partMap[chestStr] || {};
-            studentName = pInfo.name || pInfo.student_name || pInfo.studentName || pInfo.fullname || '';
+                if (!studentName) {
+            // ചെസ്സ് നമ്പർ മാത്രം നോക്കി മാപ്പിൽ നിന്ന് പേര് എടുക്കുന്നു
+            var pInfo = partMap[chestStr] || {};
+            studentName = pInfo.name || pInfo.student_name || pInfo.fullname || '';
         }
 
         if (!studentName) {
@@ -1674,12 +1678,12 @@ async function publishResultFromAnnounce(programName, category) {
     async function sendToPrizeFromAdmin(programName, category) {
     try {
 
-        // ✅ ഇനി program_name + category കൊണ്ട് ഫിൽട്ടർ ചെയ്യുന്നു
-        const { data: records, error: fetchError } = await window.dbClient
+                const { data: records, error: fetchError } = await window.dbClient
             .from('marks')
             .select('id, status, announced, is_published')
             .eq('program_name', programName)
-            .eq('category', category);
+            .or(`category.eq.${category},category.is.null`);
+
 
         if (fetchError) {
             console.error("Error fetching records:", fetchError.message);
@@ -1694,15 +1698,11 @@ async function publishResultFromAnnounce(programName, category) {
 
         let errorOccurred = false;
         for (let rec of records) {
-            let newStatus = rec.status ? rec.status + ' & Sent to Prize' : 'Sent to Prize';
-
+            // ✅ status തൊടാതെ, prize_sent മാത്രം true ആക്കുന്നു (Announced status നിലനിർത്താൻ)
             const { error: updateError } = await window.dbClient
                 .from('marks')
                 .update({
-                    prize_sent: true,
-                    status: newStatus,
-                    announced: rec.announced,
-                    is_published: rec.is_published
+                    prize_sent: true
                 })
                 .eq('id', rec.id);
 

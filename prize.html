@@ -68,7 +68,7 @@
         async function renderPrizeDesk() {
     const { data: marksList, error } = await db.from('marks')
         .select('*')
-        .ilike('status', '%Sent to Prize%')
+        .eq('prize_sent', true)
         .eq('prize_given', false);
     
     if (error) { console.error("Error fetching marks:", error); return; }
@@ -86,10 +86,8 @@
     const typeMap = {};
     (programsData || []).forEach(p => { typeMap[p.name] = p.type; });
 
-    // 🔥 Group Program-കൾ ഫിൽട്ടർ ചെയ്യുന്നു
-    let filteredMarks = marksList.filter(m => {
-        return typeMap[m.program_name] !== 'Group';
-    });
+        // 🔥 എല്ലാ പ്രോഗ്രാമുകളും (Single & Group) പ്രൈസ് ഡെസ്കിൽ എത്തുന്നതിനായി ഫിൽട്ടറിങ് ഒഴിവാക്കി
+    let filteredMarks = marksList;
 
     if (!filteredMarks || filteredMarks.length === 0) {
         container.innerHTML = "<p style='color:#888;'>No eligible programs for prize.</p>";

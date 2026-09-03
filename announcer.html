@@ -171,6 +171,9 @@
                 <button onclick="markAsAnnounced('${progName.replace(/'/g, "\\'")}', '${category.replace(/'/g, "\\'")}')" style="width:100%; margin-top:10px; background:#28a745; border:none; padding:10px; font-weight:bold; cursor:pointer; font-size:14px; border-radius:5px; color:#fff;">
                     ✅ Mark as Announced
                 </button>
+                                <button onclick="returnToPending('${progName.replace(/'/g, "\\'")}', '${category.replace(/'/g, "\\'")}')" style="width:100%; margin-top:6px; background:#dc3545; border:none; padding:8px; font-weight:bold; cursor:pointer; font-size:13px; border-radius:5px; color:#fff;">
+                    ↩️ Return to Edit / Pending
+                </button>
             </div>
         `;
     }
@@ -180,9 +183,7 @@
             const { data: records, error: fetchErr } = await db.from('marks')
                 .select('id')
                 .eq('program_name', programName)
-                .eq('category', category)   // ✅ ഇത് കൂടി ചേർക്കുക
-                .eq('status', 'Approved');   // ✅ ആപ്പ്രൂവ് ചെയ്തവ മാത്രം
-
+                .eq('status', 'Approved');
             if (fetchErr) {
                 alert('Error: ' + fetchErr.message);
                 return;
@@ -206,6 +207,34 @@
                 location.reload();
             }
         }
+                async function returnToPending(programName, category) {
+            if (!confirm(`തീർച്ചയായും "${programName}" റിസൾട്ട് തിരികെ അയக்கണോ?`)) return;
+
+            const { data: records, error: fetchErr } = await db.from('marks')
+                .select('id')
+                .eq('program_name', programName)
+                .eq('status', 'Approved');
+
+            if (fetchErr) {
+                alert('Error: ' + fetchErr.message);
+                return;
+            }
+
+            if (!records || records.length === 0) {
+                alert('റിക്കോർഡുകൾ ഒന്നും കണ്ടെത്തിയില്ല!');
+                return;
+            }
+
+            for (let rec of records) {
+                await db.from('marks')
+                    .update({ status: 'Pending' }) // അപ്രൂവ് മാറ്റിവീണ്ടും പെൻഡിങ് ആക്കുന്നു
+                    .eq('id', rec.id);
+            }
+
+            alert('റിസൾട്ട് വിജയകരമായി തിരികെ അയച്ചു!');
+            renderAnnouncerDesk();
+        }
+
     </script>
 
 </body>
